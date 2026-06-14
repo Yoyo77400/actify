@@ -1,0 +1,91 @@
+services:
+
+  # ── Frontend (Nuxt SSR / Nitro) ────────────────────────────────────────────
+  # Node server rendering pages and proxying /api/** to the api service.
+  # On "web" so the VPS proxy reaches it, on "actify-prod" to reach the api.
+  frontend:
+    build:
+      context: ./FRONT_ACTIFY
+      target: production
+    image: actify_frontend:prod
+    container_name: actify_frontend
+    restart: unless-stopped
+    networks:
+      - actify-prod
+      - web
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ── API ───────────────────────────────────────────────────────────────────
+  # Node.js/TypeScript backend. Only reachable from actify-prod (never exposed).
+  api:
+    build:
+      context: ./API_ACTIFY_NODE
+      target: production
+    image: actify_api:prod
+    container_name: actify_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    networks:
+      - actify-prod
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── DB migrations (one-shot) ───────────────────────────────────────────────
+  # Reuses the builder stage (has the Prisma CLI, schema and migrations).
+  # Runs once before the api starts, then exits.
+  migrate:
+    build:
+      context: ./API_ACTIFY_NODE
+      target: builder
+    image: actify_api:builder
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    networks:
+      - actify-prod
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Database ──────────────────────────────────────────────────────────────
+  # PostgreSQL 16. Strictly internal — no port exposed to the host.
+  db:
+    image: postgres:16-alpine
+    container_name: actify_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - actify-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  postgres_data:
+
+networks:
+  actify-prod:
+    internal: true
+  web:
+    external: true

@@ -1,0 +1,28 @@
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+/.claude/
+
+# Nodes modules
+node_modules/
+API_ACTIFY_NODE/node_modules/
+FRONT_ACTIFY/node_modules/
+
+
+# Logslogs
+*.log
+
+# Dist
+dist/
+FRONT_ACTIFY/dist/
+API_ACTIFY_NODE/dist/
+
+# Smart Contracts
+/SMART_CONTRACTS

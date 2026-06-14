@@ -1,0 +1,257 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  walletAddress String?  @unique @map("wallet_address")
+  roleId        Int      @map("role_id")
+  username      String?
+  email         String?  @unique
+  bio           String?
+  avatarCid     String?  @map("avatar_cid")
+  isVerified    Boolean  @default(false) @map("is_verified")
+  isBanned      Boolean  @default(false) @map("is_banned")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  role      Role       @relation(fields: [roleId], references: [id])
+  listings  Listing[]
+  purchases Purchase[]
+  downloads Download[]
+  reviews   Review[]
+  favorites Favorite[]
+  nfts      Nft[]      @relation("NftOwner")
+  resales   Resale[]
+
+  @@map("users")
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String
+  slug     String    @unique
+  listings Listing[]
+
+  @@map("categories")
+}
+
+model Collection {
+  id       Int       @id @default(autoincrement())
+  name     String
+  slug     String    @unique
+  img      String?
+  listings Listing[]
+
+  @@map("collections")
+}
+
+model Tag {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  listingTags ListingTag[]
+
+  @@map("tags")
+}
+
+model License {
+  id                Int       @id @default(autoincrement())
+  name              String
+  rightsDescription String    @map("rights_description")
+  allowsResale      Boolean   @map("allows_resale")
+  listings          Listing[]
+  nfts              Nft[]
+
+  @@map("licenses")
+}
+
+model Listing {
+  id                String   @id @default(uuid())
+  sellerId          String   @map("seller_id")
+  categoryId        Int      @map("category_id")
+  collectionId      Int?     @map("collection_id")
+  licenseId         Int      @map("license_id")
+  title             String
+  description       String?
+  fileIpfsCid       String?  @map("file_ipfs_cid")
+  thumbnailCid      String?  @map("thumbnail_cid")
+  isFree            Boolean  @default(false) @map("is_free")
+  price             Decimal?
+  currency          String?
+  distributionMode  String   @default("unlimited") @map("distribution_mode")
+  maxDownloads      Int?     @map("max_downloads")
+  royaltyPercentage Decimal? @map("royalty_percentage")
+  status            String   @default("Draft")
+  viewsCount        Int      @default(0) @map("views_count")
+  salesCount        Int      @default(0) @map("sales_count")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  seller      User         @relation(fields: [sellerId], references: [id])
+  category    Category     @relation(fields: [categoryId], references: [id])
+  collection  Collection?  @relation(fields: [collectionId], references: [id])
+  license     License      @relation(fields: [licenseId], references: [id])
+  listingTags ListingTag[]
+  purchases   Purchase[]
+  downloads   Download[]
+  reviews     Review[]
+  favorites   Favorite[]
+  nft         Nft?
+
+  @@map("listings")
+}
+
+model ListingTag {
+  listingId String @map("listing_id")
+  tagId     Int    @map("tag_id")
+
+  listing Listing @relation(fields: [listingId], references: [id])
+  tag     Tag     @relation(fields: [tagId], references: [id])
+
+  @@id([listingId, tagId])
+  @@map("listing_tags")
+}
+
+model Download {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  listingId    String   @map("listing_id")
+  downloadedAt DateTime @default(now()) @map("downloaded_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  listing Listing @relation(fields: [listingId], references: [id])
+
+  @@map("downloads")
+}
+
+model Purchase {
+  id          String   @id @default(uuid())
+  buyerId     String   @map("buyer_id")
+  listingId   String   @map("listing_id")
+  txHash      String   @unique @map("tx_hash")
+  amountPaid  Decimal  @map("amount_paid")
+  status      String   @default("Pending")
+  purchasedAt DateTime @default(now()) @map("purchased_at")
+
+  buyer   User    @relation(fields: [buyerId], references: [id])
+  listing Listing @relation(fields: [listingId], references: [id])
+
+  @@map("purchases")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  listingId  String   @map("listing_id")
+  reviewerId String   @map("reviewer_id")
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  listing  Listing @relation(fields: [listingId], references: [id])
+  reviewer User    @relation(fields: [reviewerId], references: [id])
+
+  @@map("reviews")
+}
+
+model Favorite {
+  userId    String   @map("user_id")
+  listingId String   @map("listing_id")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  listing Listing @relation(fields: [listingId], references: [id])
+
+  @@id([userId, listingId])
+  @@map("favorites")
+}
+
+model Nft {
+  id              String   @id @default(uuid())
+  listingId       String   @unique @map("listing_id")
+  licenseId       Int      @map("license_id")
+  tokenId         String   @map("token_id")
+  contractAddress String   @map("contract_address")
+  currentOwnerId  String   @map("current_owner_id")
+  mintedAt        DateTime @default(now()) @map("minted_at")
+
+  listing      Listing  @relation(fields: [listingId], references: [id])
+  license      License  @relation(fields: [licenseId], references: [id])
+  currentOwner User     @relation("NftOwner", fields: [currentOwnerId], references: [id])
+  resales      Resale[]
+
+  @@map("nfts")
+}
+
+model Resale {
+  id                String   @id @default(uuid())
+  nftId             String   @map("nft_id")
+  sellerId          String   @map("seller_id")
+  price             Decimal
+  currency          String
+  status            String   @default("Active")
+  txHash            String?  @unique @map("tx_hash")
+  royaltyPercentage Decimal? @map("royalty_percentage")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  nft    Nft  @relation(fields: [nftId], references: [id])
+  seller User @relation(fields: [sellerId], references: [id])
+
+  @@map("resales")
+}
+
+model LogCategory {
+  code        String    @id
+  description String?
+  logTypes    LogType[]
+
+  @@map("log_categories")
+}
+
+model LogType {
+  code         String   @id
+  categoryCode String   @map("category_code")
+  description  String?
+  rawLogs      RawLog[]
+
+  category LogCategory @relation(fields: [categoryCode], references: [code])
+
+  @@map("log_types")
+}
+
+model RawLog {
+  id          String   @id @default(uuid())
+  logTypeCode String   @map("log_type_code")
+  actorId     String?  @map("actor_id")
+  targetType  String?  @map("target_type")
+  targetId    String?  @map("target_id")
+  payload     Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  logType LogType @relation(fields: [logTypeCode], references: [code])
+
+  @@map("raw_logs")
+}
+
+model AggregatedStat {
+  id            String   @id @default(uuid())
+  targetType    String   @map("target_type")
+  targetId      String?  @map("target_id")
+  metricName    String   @map("metric_name")
+  metricValue   Decimal  @map("metric_value")
+  period        String
+  referenceDate DateTime @map("reference_date") @db.Date
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("aggregated_stats")
+}

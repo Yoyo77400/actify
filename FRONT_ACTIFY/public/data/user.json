@@ -1,0 +1,12 @@
+{
+  "id": "user-001",
+  "email": "fouad@actify.io",
+  "displayName": "Fouad H.",
+  "username": "fouad",
+  "role": "creator",
+  "avatar": "https://picsum.photos/seed/fouad/200/200",
+  "bio": "Créateur de contenu digital sur Actify.",
+  "wallet": null,
+  "totpEnabled": false,
+  "createdAt": "2025-01-12T10:00:00Z"
+}

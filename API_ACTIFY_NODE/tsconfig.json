@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "sourceMap": true
+  },
+  // generated/ holds the Prisma 7 client (emitted as TS, @ts-nocheck) — it must
+  // be compiled with the app so the client lands in dist/.
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist", "prisma.config.ts"]
+}

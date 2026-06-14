@@ -1,0 +1,82 @@
+{
+  "categories": [
+    { "id": "all", "label": "All" },
+    { "id": "3d", "label": "3D Models" },
+    { "id": "templates", "label": "Templates" },
+    { "id": "code", "label": "Code" },
+    { "id": "design", "label": "Design" },
+    { "id": "audio", "label": "Audio" }
+  ],
+  "chains": [
+    { "id": "xrp", "label": "XRP" }
+  ],
+  "hero": [
+    {
+      "id": "mountain-of-hell-series",
+      "title": "Mountain of Hell Series",
+      "creator": "Ethan22",
+      "verified": true,
+      "image": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1600&q=80",
+      "stats": [
+        { "label": "Floor price", "value": "12 XRP" },
+        { "label": "Total assets", "value": "24" },
+        { "label": "License type", "value": "Commercial" },
+        { "label": "Sales", "value": "142" }
+      ]
+    },
+    {
+      "id": "ui-systems-v2",
+      "title": "UI Systems v2",
+      "creator": "Noema",
+      "verified": true,
+      "image": "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1800&q=80",
+      "stats": [
+        { "label": "Floor price", "value": "8 XRP" },
+        { "label": "Total assets", "value": "56" },
+        { "label": "License type", "value": "Personal" },
+        { "label": "Sales", "value": "87" }
+      ]
+    }
+  ],
+  "trendingTokens": [
+    { "id": "mountain-kit", "name": "Mountain 3D Kit", "symbol": "3D", "image": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=80&q=80", "priceLabel": "29 XRP", "change": 18.82 },
+    { "id": "dashboard-ui", "name": "Dashboard UI Kit", "symbol": "UI", "image": "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=80&q=80", "priceLabel": "19 XRP", "change": 3.13 },
+    { "id": "react-pack", "name": "React Component Pack", "symbol": "CODE", "image": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=80&q=80", "priceLabel": "49 XRP", "change": 46.88 },
+    { "id": "motion-kit", "name": "Motion Graphics Kit", "symbol": "VFX", "image": "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=80&q=80", "priceLabel": "35 XRP", "change": 12.1 },
+    { "id": "3d-characters", "name": "3D Character Pack", "symbol": "3D", "image": "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=80&q=80", "priceLabel": "55 XRP", "change": -5.4 },
+    { "id": "icon-system", "name": "Icon System Pro", "symbol": "UI", "image": "https://images.unsplash.com/photo-1621761191319-c6fb62004040?auto=format&fit=crop&w=80&q=80", "priceLabel": "12 XRP", "change": 8.2 }
+  ],
+  "featuredCollections": [
+    { "id": "mountain-collection", "name": "Mountain of Hell Series", "floorPrice": "12 XRP", "change": 15.2, "image": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80" },
+    { "id": "ui-systems", "name": "UI Systems by Noema", "floorPrice": "8 XRP", "change": 7.4, "image": "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80" },
+    { "id": "dev-assets", "name": "Dev Asset Pack", "floorPrice": "22 XRP", "change": -2.1, "image": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80" }
+  ],
+  "topSellers": [
+    { "id": "ethan22", "name": "Ethan22", "image": "https://picsum.photos/seed/ethan22/60/60", "floorPrice": "12", "currency": "XRP", "change": 22.7, "verified": true },
+    { "id": "noema", "name": "Noema", "image": "https://picsum.photos/seed/noema/60/60", "floorPrice": "8", "currency": "XRP", "change": 6.0, "verified": true },
+    { "id": "boto", "name": "Boto", "image": "https://picsum.photos/seed/boto/60/60", "floorPrice": "19", "currency": "XRP", "change": 0, "verified": true },
+    { "id": "vizlab", "name": "VizLab", "image": "https://picsum.photos/seed/vizlab/60/60", "floorPrice": "34", "currency": "XRP", "change": -4.2, "verified": false },
+    { "id": "codecraft", "name": "CodeCraft", "image": "https://picsum.photos/seed/codecraft/60/60", "floorPrice": "49", "currency": "XRP", "change": 11.3, "verified": true },
+    { "id": "designio", "name": "Designio", "image": "https://picsum.photos/seed/designio/60/60", "floorPrice": "15", "currency": "XRP", "change": 3.1, "verified": true }
+  ],
+  "featuredDrops": [
+    { "id": "drop-1", "name": "Alpine 3D Collection", "subtitle": "Available April 14", "image": "https://images.unsplash.com/photo-1473116763249-2faaef81ccda?auto=format&fit=crop&w=1200&q=80" },
+    { "id": "drop-2", "name": "Tailwind UI System v3", "subtitle": "Live now", "image": "https://images.unsplash.com/photo-1639322537228-f710d846310a?auto=format&fit=crop&w=1200&q=80", "badge": "Live" },
+    { "id": "drop-3", "name": "Audio FX Pack Vol.2", "subtitle": "Available April 16", "image": "https://images.unsplash.com/photo-1621761191319-c6fb62004040?auto=format&fit=crop&w=1200&q=80" }
+  ],
+  "weeklyShowcase": {
+    "title": "Mountain of Hell #0",
+    "subtitle": "7d sales: 142 licenses",
+    "background": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1400&q=80",
+    "items": [
+      { "id": "moh-1", "name": "Mountain Kit #01", "price": "12 XRP", "image": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80" },
+      { "id": "moh-2", "name": "Mountain Kit #02", "price": "12 XRP", "image": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80" },
+      { "id": "moh-3", "name": "Mountain Kit #03", "price": "12 XRP", "image": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80" }
+    ]
+  },
+  "nft101": [
+    { "id": "edu-1", "title": "What is a digital license?", "image": "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=1200&q=80" },
+    { "id": "edu-2", "title": "How to buy an asset on Actify?", "image": "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1200&q=80" },
+    { "id": "edu-3", "title": "How does XRP licensing work?", "image": "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=1200&q=80" }
+  ]
+}

@@ -1,0 +1,61 @@
+# =============================================================================
+# Development stack. Run: docker compose up
+#   - frontend : Nuxt dev server with hot reload on :8080
+#   - db       : PostgreSQL exposed on :5432 (for the API run locally)
+#
+# The API is NOT containerised here yet (no HTTP server / dev script).
+# Run it locally with `npm` against this db; it reads DATABASE_URL from
+# API_ACTIFY_NODE/.env (localhost:5432). No /api proxy in dev — the front
+# calls the API directly via NUXT_PUBLIC_API_BASE.
+# Add an `api` service here once it exposes a server + watch script.
+# =============================================================================
+services:
+
+  frontend:
+    build:
+      context: ./FRONT_ACTIFY
+      target: development
+    container_name: actify_frontend_dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: development
+      # Direct call to the API running on the host (no proxy in dev)
+      NUXT_PUBLIC_API_BASE: http://localhost:3000/api/v1
+    volumes:
+      - ./FRONT_ACTIFY:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - actify-dev
+
+  db:
+    image: postgres:16-alpine
+    container_name: actify_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: actify
+      POSTGRES_PASSWORD: actify
+      POSTGRES_DB: actify
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - actify-dev
+
+volumes:
+  frontend_node_modules:
+  postgres_data:
+
+networks:
+  actify-dev:
