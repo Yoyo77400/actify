@@ -22,7 +22,7 @@ async function fetchWithFallback<T>(path: string, fallback: T) {
 
 // API functions - Cette partie sera à reprendre plus tard dans les appels pour améliorer les fetchs
 export async function useHomeData() {
-  return await fetchWithFallback<HomePayload>('https://bafybeicwjm7x5v66pap7ivy6xj3mmwiv2vczxok6o6on4o5gle2pcinooy.ipfs.dweb.link/?filename=home.json', homeMock)
+  return await fetchWithFallback<HomePayload>('https://ipfs.io/ipns/k51qzi5uqu5dgceyd3jw1frpcnqbd4thybutzgn6u8h6lus91op97lm964b29c', homeMock)
 }
 
 // L'api et les données mock ne sont pas disponible pour les fonctions suivantes

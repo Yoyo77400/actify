@@ -1,0 +1,33 @@
+name: Deploy Actify
+
+on:
+  push:
+    branches: [main]
+
+# Un seul déploiement à la fois ; les pushes suivants attendent la fin du courant.
+concurrency:
+  group: deploy-actify
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy sur le VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/apps/actify
+            # Aligne le VPS exactement sur origin/main (peu importe sa branche actuelle).
+            # Le .env de prod est gitignored → préservé.
+            git fetch --prune origin
+            git checkout -B main origin/main
+            docker compose -f docker-compose.prod.yml up -d --build
+            docker image prune -f
+            # Vérifie que la stack est saine (laisse le temps au healthcheck de remonter)
+            curl -fsS --retry 10 --retry-delay 3 --retry-all-errors \
+              https://actify.yohan-georgelin.fr/api/v1/health
