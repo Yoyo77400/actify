@@ -20,5 +20,10 @@
     "tailwindcss": "^4.2.2",
     "vue": "^3.5.30",
     "vue-router": "^5.0.4"
+  },
+  "devDependencies": {
+    "@iconify-json/logos": "^1.2.11",
+    "@iconify-json/mdi": "^1.2.3",
+    "@iconify-json/ph": "^1.2.2"
   }
 }

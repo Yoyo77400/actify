@@ -8,7 +8,7 @@ export function useAuth() {
     // simule un délai de connexion OAuth
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    const { data } = await useFetch<User>('https://bafybeigdkfaacirj7uf3mbdunriwl53xe4rwwjooum7iza3slyrmcdmqpi.ipfs.dweb.link/?filename=user.json')
+    const { data } = await useFetch<User>('https://ipfs.io/ipns/k51qzi5uqu5dgceyd3jw1frpcnqbd4thybutzgn6u8h6lus91op97lm964b29c')
     if (data.value) {
       store.setUser({
         ...data.value,

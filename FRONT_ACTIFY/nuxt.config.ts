@@ -5,8 +5,10 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['@/assets/styles/main.css'],
-  // Production only: the Nitro server proxies /api/* to the internal API
-  // service (docker network actify-prod). The API is never exposed directly.
+  // Prod: transparent proxy of the whole backend namespace to the internal
+  // service. Versioning (v1, v2…) is the backend's call — the proxy never needs
+  // to change. Works because Nuxt's own server endpoints live outside /api
+  // (see icon.localApiEndpoint below).
   $production: {
     routeRules: {
       '/api/**': { proxy: 'http://api:3000/api/**' },
@@ -17,6 +19,10 @@ export default defineNuxtConfig({
     '@nuxt/fonts',
     '@nuxt/icon',
   ],
+  // Move @nuxt/icon's runtime endpoint out of /api so the backend owns /api/**.
+  icon: {
+    localApiEndpoint: '/_nuxt_icon',
+  },
   fonts: {
     adobe: {
       id: ['hos5ftm'],
