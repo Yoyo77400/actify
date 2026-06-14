@@ -70,16 +70,17 @@
       </p>
 
       <!-- CTA -->
-      <NuxtLink
-        to="/"
-        class="cta-btn group relative inline-flex items-center gap-3 mt-10 px-6 py-3 border border-white/10 rounded transition-all duration-300 hover:border-[rgba(110,90,220,0.4)] hover:-translate-y-px"
+      <button
+        type="button"
+        @click="leave('/')"
+        class="cta-btn group relative inline-flex items-center gap-3 mt-10 px-6 py-3 border border-white/10 rounded transition-all duration-300 cursor-pointer hover:border-[rgba(110,90,220,0.4)] hover:-translate-y-px"
         style="font-family: 'Ethnocentric', sans-serif; font-size: clamp(0.55rem,1.1vw,0.7rem); letter-spacing: 0.12em; color: #c5c3d6; background: rgba(255,255,255,0.02);"
       >
         <span>Retour à l'accueil</span>
         <svg class="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" viewBox="0 0 20 20" fill="none">
           <path d="M4 10H16M16 10L11 5M16 10L11 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-      </NuxtLink>
+      </button>
     </div>
 
     <!-- Footer -->
@@ -90,8 +91,8 @@
       <div class="flex flex-col gap-1 items-center md:items-start">
         <span>© 2024 ActiFy Ledger. All Rights Reserved.</span>
         <nav class="flex gap-4">
-          <NuxtLink to="/privacy" class="underline underline-offset-2 text-white/30 hover:text-[#8b7aef] transition-colors duration-300">GDPR Privacy</NuxtLink>
-          <NuxtLink to="/terms" class="underline underline-offset-2 text-white/30 hover:text-[#8b7aef] transition-colors duration-300">Terms of Service</NuxtLink>
+          <button type="button" @click="leave('/privacy')" class="underline underline-offset-2 text-white/30 hover:text-[#8b7aef] transition-colors duration-300 cursor-pointer">GDPR Privacy</button>
+          <button type="button" @click="leave('/terms')" class="underline underline-offset-2 text-white/30 hover:text-[#8b7aef] transition-colors duration-300 cursor-pointer">Terms of Service</button>
         </nav>
       </div>
       <div class="flex flex-col gap-1 items-center md:items-end">
@@ -99,7 +100,7 @@
           <span class="w-1.5 h-1.5 rounded-full bg-green-400" style="box-shadow: 0 0 6px rgba(74,222,128,0.4);" />
           <span>Solana Status: Operational</span>
         </div>
-        <NuxtLink to="/security" class="underline underline-offset-2 text-white/30 hover:text-[#8b7aef] transition-colors duration-300">Security</NuxtLink>
+        <button type="button" @click="leave('/security')" class="underline underline-offset-2 text-white/30 hover:text-[#8b7aef] transition-colors duration-300 cursor-pointer">Security</button>
       </div>
     </footer>
   </div>
@@ -109,6 +110,9 @@
 import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue'
 
 definePageMeta({ layout: false })
+
+// On an error page, internal links don't reset the error state — use clearError.
+const leave = (to) => clearError({ redirect: to })
 
 useHead({
   title: '404 — ActiFy Ledger',
