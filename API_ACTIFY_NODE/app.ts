@@ -1,7 +1,8 @@
-import express, { type ErrorRequestHandler } from 'express'
+import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import { v1Router } from './routes/v1'
+import { errorHandler } from './middlewares/error-handler'
 
 export function createApp() {
   const app = express()
@@ -14,13 +15,9 @@ export function createApp() {
 
   // Unknown route → JSON 404 (API contract, not HTML).
   app.use((_req, res) => {
-    res.status(404).json({ error: 'Not Found' })
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Not Found', details: {} } })
   })
 
-  const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
-    console.error(err)
-    res.status(500).json({ error: 'Internal Server Error' })
-  }
   app.use(errorHandler)
 
   return app

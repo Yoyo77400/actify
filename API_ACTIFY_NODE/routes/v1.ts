@@ -1,5 +1,8 @@
 import { Router } from 'express'
 import { prisma } from '../services/prisma'
+import { usersRouter } from './users.routes'
+import { walletsRouter } from './wallets.routes'
+import { assetsRouter } from './assets.routes'
 
 export const v1Router = Router()
 
@@ -12,3 +15,7 @@ v1Router.get('/health', async (_req, res) => {
     res.status(503).json({ status: 'error', db: 'down' })
   }
 })
+
+v1Router.use('/users', usersRouter)
+v1Router.use('/wallets', walletsRouter)
+v1Router.use('/assets', assetsRouter)
