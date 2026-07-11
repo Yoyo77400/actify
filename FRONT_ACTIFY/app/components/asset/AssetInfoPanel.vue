@@ -39,7 +39,7 @@
     </div>
 
     <div class="surface--soft mt-[18px] p-3 grid grid-cols-[1fr_180px] max-md:grid-cols-1 gap-3">
-      <input class="input" type="text" placeholder="Choose your amount" />
+      <input class="input" type="text" placeholder="Choose your amount" >
       <button class="primary-btn">Buy</button>
     </div>
   </section>

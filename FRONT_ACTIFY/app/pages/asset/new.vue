@@ -29,7 +29,7 @@ async function submitForm() {
   <div class="p-4 max-w-2xl mx-auto">
     <h1 class="text-2xl font-bold mb-4">Create New Asset</h1>
 
-    <form @submit.prevent="submitForm" class="space-y-4">
+    <form class="space-y-4" @submit.prevent="submitForm">
       <div>
         <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
           Name
@@ -40,7 +40,7 @@ async function submitForm() {
           type="text"
           required
           class="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+        >
       </div>
 
       <div>
@@ -65,9 +65,9 @@ async function submitForm() {
           type="file"
           accept="image/*"
           required
-          @change="handleFileUpload"
           class="block w-full rounded-md border border-gray-300 p-2 text-sm text-gray-500 file:mr-4 file:rounded-md file:border file:border-gray-300 file:bg-gray-50 file:px-4 file:py-2 file:text-sm file:font-semibold hover:file:bg-gray-100"
-        />
+          @change="handleFileUpload"
+        >
       </div>
 
       <div v-if="imagePreview" class="mt-2">
@@ -75,7 +75,7 @@ async function submitForm() {
           :src="imagePreview"
           alt="Preview"
           class="h-40 w-auto rounded-md border object-cover"
-        />
+        >
       </div>
 
       <button

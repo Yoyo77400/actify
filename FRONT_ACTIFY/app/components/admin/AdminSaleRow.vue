@@ -1,7 +1,7 @@
 <template>
   <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-line last:border-b-0">
     <div class="flex items-center gap-3 min-w-0">
-      <img class="w-9 h-9 rounded-[8px] object-cover shrink-0" :src="sale.assetImage" :alt="sale.assetName" />
+      <img class="w-9 h-9 rounded-[8px] object-cover shrink-0" :src="sale.assetImage" :alt="sale.assetName" >
       <div class="min-w-0">
         <p class="m-0 text-sm font-medium truncate">{{ sale.assetName }}</p>
         <p class="m-0 text-xs text-muted-2 mt-0.5">{{ sale.seller }} → {{ sale.buyer }}</p>

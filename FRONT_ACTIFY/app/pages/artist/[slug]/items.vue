@@ -9,7 +9,7 @@
         <CommonSectionHeader title="Items" :subtitle="`${payload.items.length} results`" />
         <div class="surface--soft grid grid-cols-[54px_minmax(0,380px)] max-lg:grid-cols-[54px_1fr] gap-3 p-3 mb-4">
           <button class="ghost-btn" type="button">«</button>
-          <input class="input" type="search" placeholder="Search" />
+          <input class="input" type="search" placeholder="Search" >
         </div>
 
         <div class="grid grid-cols-3 max-xl:grid-cols-2 max-md:grid-cols-1 gap-4 items-start">

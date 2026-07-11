@@ -5,7 +5,7 @@
         class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         :src="collection.image"
         :alt="collection.name"
-      />
+      >
     </div>
     <div class="p-3.5">
       <h3 class="ethnocentric m-0 text-sm">{{ collection.name }}</h3>

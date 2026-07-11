@@ -21,7 +21,7 @@
             class="w-full h-[160px] max-sm:h-[140px] object-cover transition-transform duration-300 hover:scale-105"
             :src="item.image"
             :alt="item.name"
-          />
+          >
         </div>
         <div class="p-2.5">
           <h4 class="ethnocentric m-0 text-[13px]">{{ item.name }}</h4>

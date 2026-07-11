@@ -5,7 +5,7 @@
         class="w-full h-full object-cover brightness-[0.72] transition-transform duration-300 group-hover:scale-105"
         :src="item.image"
         :alt="item.name"
-      />
+      >
     </div>
     <div
       class="absolute inset-x-0 bottom-0 p-3.5"

@@ -31,14 +31,16 @@ const props = defineProps<{
   last: boolean
 }>()
 
+const transferEntry = { icon: 'ph:arrow-right', bg: 'bg-muted/12 text-muted' }
+
 const iconMap: Record<string, { icon: string; bg: string }> = {
   sale: { icon: 'ph:tag', bg: 'bg-success/12 text-success' },
   purchase: { icon: 'ph:shopping-cart', bg: 'bg-accent/12 text-accent' },
   mint: { icon: 'ph:sparkle', bg: 'bg-warning/12 text-warning' },
-  transfer: { icon: 'ph:arrow-right', bg: 'bg-muted/12 text-muted' }
+  transfer: transferEntry
 }
 
-const entry = computed(() => iconMap[props.activity.type] ?? iconMap.transfer)
+const entry = computed(() => iconMap[props.activity.type] ?? transferEntry)
 const iconName = computed(() => entry.value.icon)
 const iconBg = computed(() => entry.value.bg)
 </script>

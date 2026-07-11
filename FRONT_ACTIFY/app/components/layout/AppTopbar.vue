@@ -13,7 +13,7 @@
         class="flex-1 bg-transparent border-0 outline-none text-foreground placeholder:text-muted"
         type="text"
         placeholder="Search Actify"
-      />
+      >
       <span class="text-muted">/</span>
     </div>
 
