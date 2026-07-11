@@ -80,8 +80,6 @@
 </template>
 
 <script setup lang="ts">
-import type { MeProfile } from '~/types/auth'
-
 definePageMeta({ layout: 'auth', middleware: 'auth' })
 
 useHead({ title: 'Créer mon compte' })
@@ -110,7 +108,7 @@ async function submit() {
   try {
     // PUT /users/me returns the profile without `stats` — refetch the full
     // shape rather than storing a partial one.
-    await api.put<MeProfile>('/users/me', {
+    await api.put('/users/me', {
       username: form.username,
       displayName: form.displayName || null,
       bio: form.bio || null,

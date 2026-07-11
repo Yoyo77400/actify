@@ -1,6 +1,6 @@
 import { prisma } from './prisma'
 import { AppError } from '../utils/http'
-import { signAccessToken, verifyToken } from '../utils/jwt'
+import { signAccessToken, signRefreshToken, verifyToken } from '../utils/jwt'
 
 // Stateless refresh: the refresh token is self-contained (no session store
 // yet), so we can only re-check the user's current standing before minting a
@@ -23,5 +23,11 @@ export async function refreshSession(refreshToken: string) {
     throw new AppError(403, 'USER_BANNED', 'Compte banni')
   }
 
-  return { accessToken: signAccessToken(user.id) }
+  // Rotation: hand back a fresh refresh token so clients always hold the
+  // newest one. Statelessness means the old token stays valid until expiry —
+  // true revocation needs the session store.
+  return {
+    accessToken: signAccessToken(user.id),
+    refreshToken: signRefreshToken(user.id),
+  }
 }

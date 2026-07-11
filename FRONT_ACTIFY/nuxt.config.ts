@@ -18,7 +18,9 @@ export default defineNuxtConfig({
   // and no CORS. NUXT_PUBLIC_API_BASE can still override apiBase if needed.
   $development: {
     routeRules: {
-      '/api/**': { proxy: 'http://localhost:3000/api/**' },
+      // 127.0.0.1, not localhost: the API binds IPv4 only, and localhost can
+      // resolve to ::1 first — where an unrelated dev server may be listening.
+      '/api/**': { proxy: 'http://127.0.0.1:3000/api/**' },
     },
   },
   runtimeConfig: {

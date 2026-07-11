@@ -10,6 +10,8 @@ interface ApiEnvelope<T> {
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   body?: Record<string, unknown>
+  /** false = never send the Authorization header (anonymous-by-intent calls, e.g. wallet login). */
+  auth?: boolean
 }
 
 /** Extracts the backend's error payload from a failed request, if any. */
@@ -23,35 +25,63 @@ export function toApiError(err: unknown): ApiError | null {
 export function useApi() {
   const config = useRuntimeConfig()
   const store = useAuthStore()
+  // Stashed on nuxtApp, NOT at module scope: module state would leak one
+  // user's refresh promise into another request during SSR.
+  const nuxtApp = useNuxtApp() as { _refreshInFlight?: Promise<void> | null }
 
   async function rawRequest<T>(path: string, opts: RequestOptions): Promise<T> {
+    const sendAuth = opts.auth !== false && !!store.accessToken
     const res = await $fetch<ApiEnvelope<T>>(path, {
       baseURL: config.public.apiBase,
       method: opts.method ?? 'GET',
       body: opts.body,
-      headers: store.accessToken ? { Authorization: `Bearer ${store.accessToken}` } : {},
+      headers: sendAuth ? { Authorization: `Bearer ${store.accessToken}` } : {},
     })
     return res.data
   }
 
-  // Access tokens only live 15 min: on 401, swap the refresh token for a new
-  // one and replay the request once before giving up.
+  // Single-flight: concurrent 401s share one /auth/refresh round-trip. The
+  // backend rotates the refresh token, so the new pair must be stored.
+  function refreshSession(): Promise<void> {
+    nuxtApp._refreshInFlight ??= $fetch<ApiEnvelope<{ accessToken: string; refreshToken: string }>>('/auth/refresh', {
+      baseURL: config.public.apiBase,
+      method: 'POST',
+      body: { refreshToken: store.refreshToken },
+    })
+      .then((res) => {
+        store.setTokens(res.data)
+      })
+      .catch((err) => {
+        // Only a rejected token kills the session; a network blip must not log the user out.
+        if (err instanceof FetchError && err.statusCode && err.statusCode < 500) {
+          store.clearSession()
+        }
+        throw err
+      })
+      .finally(() => {
+        nuxtApp._refreshInFlight = null
+      })
+    return nuxtApp._refreshInFlight
+  }
+
+  // Access tokens only live 15 min: on an expiry 401 (and only that — business
+  // 401s like INVALID_SIGNATURE must not replay mutating requests), swap the
+  // refresh token for a new pair and replay the request once.
   async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     try {
       return await rawRequest<T>(path, opts)
     } catch (err) {
-      const expired = err instanceof FetchError && err.statusCode === 401 && store.refreshToken
+      const expired =
+        opts.auth !== false
+        && err instanceof FetchError
+        && err.statusCode === 401
+        && toApiError(err)?.code === 'AUTH_REQUIRED'
+        && !!store.refreshToken
       if (!expired) throw err
 
       try {
-        const { accessToken } = await $fetch<ApiEnvelope<{ accessToken: string }>>('/auth/refresh', {
-          baseURL: config.public.apiBase,
-          method: 'POST',
-          body: { refreshToken: store.refreshToken },
-        }).then(res => res.data)
-        store.setTokens({ accessToken })
+        await refreshSession()
       } catch {
-        store.clearSession()
         throw err
       }
       return await rawRequest<T>(path, opts)
@@ -59,9 +89,11 @@ export function useApi() {
   }
 
   return {
-    get: <T>(path: string) => request<T>(path),
-    post: <T>(path: string, body?: Record<string, unknown>) => request<T>(path, { method: 'POST', body }),
+    get: <T>(path: string, opts?: Pick<RequestOptions, 'auth'>) => request<T>(path, opts),
+    post: <T>(path: string, body?: Record<string, unknown>, opts?: Pick<RequestOptions, 'auth'>) =>
+      request<T>(path, { ...opts, method: 'POST', body }),
     put: <T>(path: string, body?: Record<string, unknown>) => request<T>(path, { method: 'PUT', body }),
     del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+    refreshSession,
   }
 }

@@ -18,11 +18,14 @@ describe('refreshSession', () => {
     findUnique.mockReset()
   })
 
-  it('issues a fresh access token for a valid refresh token', async () => {
+  it('issues a fresh token pair for a valid refresh token', async () => {
     findUnique.mockResolvedValue(activeUser as never)
-    const { accessToken } = await refreshSession(signRefreshToken('user-1'))
+    const { accessToken, refreshToken } = await refreshSession(signRefreshToken('user-1'))
     expect(verifyToken(accessToken)?.sub).toBe('user-1')
     expect(verifyToken(accessToken)?.type).toBeUndefined()
+    // Rotated refresh token: same subject, still marked as refresh.
+    expect(verifyToken(refreshToken)?.sub).toBe('user-1')
+    expect(verifyToken(refreshToken)?.type).toBe('refresh')
   })
 
   it('rejects an access token used as refresh token', async () => {

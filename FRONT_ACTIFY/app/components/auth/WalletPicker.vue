@@ -38,16 +38,25 @@ defineEmits<{ select: [id: WalletId] }>()
 // undefined = check in progress → button stays disabled, no "Installer" link yet.
 const availability = ref<Partial<Record<WalletId, boolean>>>({})
 
+function checkAvailability(id: WalletId, attempt = 0) {
+  getWalletAdapter(id)
+    .then(adapter => adapter.isAvailable())
+    .then((available) => {
+      availability.value[id] = available
+      // Extensions inject their API asynchronously — one delayed re-check
+      // avoids showing "Installer" to users who do have the wallet.
+      if (!available && attempt === 0) {
+        setTimeout(() => checkAvailability(id, 1), 1500)
+      }
+    })
+    .catch(() => {
+      availability.value[id] = false
+    })
+}
+
 onMounted(() => {
   for (const { id } of walletDescriptors) {
-    getWalletAdapter(id)
-      .then(adapter => adapter.isAvailable())
-      .then((available) => {
-        availability.value[id] = available
-      })
-      .catch(() => {
-        availability.value[id] = false
-      })
+    checkAvailability(id)
   }
 })
 </script>

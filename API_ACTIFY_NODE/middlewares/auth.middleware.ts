@@ -40,17 +40,24 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
   }
 }
 
-// Best-effort: attaches req.user when a valid access token is present, but
-// never rejects the request. POST /wallets/verify behaves differently
-// depending on whether the caller already has a session (link) or not (login).
+// Attaches req.user when a valid access token is present; anonymous callers
+// pass through. POST /wallets/verify behaves differently depending on whether
+// the caller already has a session (link) or not (login/signup).
+// A PRESENTED token that turns out invalid/expired is rejected instead of
+// silently downgraded to anonymous: downgrading would turn a wallet-link
+// attempt into a signup that binds the wallet to a fresh orphan account.
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   try {
     const token = extractBearerToken(req.header('authorization'))
     if (token) {
       const user = await resolveUser(token)
-      if (user && !user.isBanned) {
-        req.user = { id: user.id }
+      if (!user) {
+        throw new AppError(401, 'AUTH_REQUIRED', 'Token manquant ou invalide')
       }
+      if (user.isBanned) {
+        throw new AppError(403, 'USER_BANNED', 'Compte banni')
+      }
+      req.user = { id: user.id }
     }
     next()
   } catch (err) {
