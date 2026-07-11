@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { prisma } from '../services/prisma'
+import { authRouter } from './auth.routes'
 import { usersRouter } from './users.routes'
 import { walletsRouter } from './wallets.routes'
 import { assetsRouter } from './assets.routes'
@@ -16,6 +17,7 @@ v1Router.get('/health', async (_req, res) => {
   }
 })
 
+v1Router.use('/auth', authRouter)
 v1Router.use('/users', usersRouter)
 v1Router.use('/wallets', walletsRouter)
 v1Router.use('/assets', assetsRouter)
