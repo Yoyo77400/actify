@@ -19,23 +19,19 @@
         <p class="text-muted text-xs tracking-widest uppercase mt-1">Secure Gateway</p>
       </div>
 
-      <div class="w-full flex flex-col gap-3">
-        <AuthOAuthButton
-          provider="google"
-          :loading="pending === 'google'"
-          @click="signIn('google')"
-        />
-        <AuthOAuthButton
-          provider="github"
-          :loading="pending === 'github'"
-          @click="signIn('github')"
-        />
-      </div>
+      <AuthWalletPicker :pending="pending" @select="loginWithWallet" />
+
+      <p v-if="error" class="text-red-400 text-xs text-center" role="alert">{{ error }}</p>
 
       <div class="w-full flex items-center gap-3">
         <div class="flex-1 h-px bg-line" />
-        <span class="text-muted text-xs tracking-widest uppercase">Curated Access</span>
+        <span class="text-muted text-xs tracking-widest uppercase">Bientôt</span>
         <div class="flex-1 h-px bg-line" />
+      </div>
+
+      <div class="w-full flex flex-col gap-3">
+        <AuthOAuthButton provider="google" disabled />
+        <AuthOAuthButton provider="github" disabled />
       </div>
 
       <p class="text-muted text-xs text-center leading-relaxed">
@@ -67,14 +63,13 @@ definePageMeta({ layout: 'auth' })
 
 useHead({ title: 'Connexion' })
 
-const { mockLogin } = useAuth()
-const pending = ref<'google' | 'github' | null>(null)
+const { isLoggedIn } = useAuth()
+const { pending, error, loginWithWallet } = useWalletAuth()
 
-async function signIn(provider: 'google' | 'github') {
-  pending.value = provider
-  await mockLogin(provider)
-  pending.value = null
+if (isLoggedIn.value) {
+  await navigateTo('/profile')
 }
+
 const date = new Date()
 const year = date.getFullYear()
 
