@@ -16,18 +16,20 @@ model Role {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  walletAddress String?  @unique @map("wallet_address")
-  roleId        Int      @map("role_id")
-  username      String?
-  email         String?  @unique
-  bio           String?
-  avatarCid     String?  @map("avatar_cid")
-  isVerified    Boolean  @default(false) @map("is_verified")
-  isBanned      Boolean  @default(false) @map("is_banned")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id          String    @id @default(uuid())
+  roleId      Int       @map("role_id")
+  username    String?   @unique
+  displayName String?   @map("display_name")
+  email       String?   @unique
+  bio         String?
+  avatarCid   String?   @map("avatar_cid")
+  isVerified  Boolean   @default(false) @map("is_verified")
+  isBanned    Boolean   @default(false) @map("is_banned")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  deletedAt   DateTime? @map("deleted_at")
 
   role      Role       @relation(fields: [roleId], references: [id])
+  wallets   Wallet[]
   listings  Listing[]
   purchases Purchase[]
   downloads Download[]
@@ -39,11 +41,42 @@ model User {
   @@map("users")
 }
 
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  address   String   @unique
+  chain     String
+  label     String?
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("wallets")
+}
+
+// Short-lived sign-in challenges for the wallet-connect flow (login/signup
+// and linking additional wallets). Consumed once, then kept for audit until
+// expiry cleanup.
+model WalletChallenge {
+  id         String    @id @default(uuid())
+  address    String
+  chain      String
+  nonce      String    @unique
+  message    String
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([address, chain])
+  @@map("wallet_challenges")
+}
+
 model Category {
-  id       Int       @id @default(autoincrement())
-  name     String
-  slug     String    @unique
-  listings Listing[]
+  id                Int               @id @default(autoincrement())
+  name              String
+  slug              String            @unique
+  listingCategories ListingCategory[]
 
   @@map("categories")
 }
@@ -78,38 +111,51 @@ model License {
 }
 
 model Listing {
-  id                String   @id @default(uuid())
-  sellerId          String   @map("seller_id")
-  categoryId        Int      @map("category_id")
-  collectionId      Int?     @map("collection_id")
-  licenseId         Int      @map("license_id")
+  id                String    @id @default(uuid())
+  sellerId          String    @map("seller_id")
+  collectionId      Int?      @map("collection_id")
+  licenseId         Int?      @map("license_id")
+  slug              String?   @unique
   title             String
+  shortDescription  String?   @map("short_description")
   description       String?
-  fileIpfsCid       String?  @map("file_ipfs_cid")
-  thumbnailCid      String?  @map("thumbnail_cid")
-  isFree            Boolean  @default(false) @map("is_free")
+  fileIpfsCid       String?   @map("file_ipfs_cid")
+  thumbnailCid      String?   @map("thumbnail_cid")
+  isFree            Boolean   @default(false) @map("is_free")
   price             Decimal?
   currency          String?
-  distributionMode  String   @default("unlimited") @map("distribution_mode")
-  maxDownloads      Int?     @map("max_downloads")
-  royaltyPercentage Decimal? @map("royalty_percentage")
-  status            String   @default("Draft")
-  viewsCount        Int      @default(0) @map("views_count")
-  salesCount        Int      @default(0) @map("sales_count")
-  createdAt         DateTime @default(now()) @map("created_at")
+  distributionMode  String    @default("unlimited") @map("distribution_mode")
+  maxDownloads      Int?      @map("max_downloads")
+  royaltyPercentage Decimal?  @map("royalty_percentage")
+  status            String    @default("Draft")
+  viewsCount        Int       @default(0) @map("views_count")
+  salesCount        Int       @default(0) @map("sales_count")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  deletedAt         DateTime? @map("deleted_at")
 
-  seller      User         @relation(fields: [sellerId], references: [id])
-  category    Category     @relation(fields: [categoryId], references: [id])
-  collection  Collection?  @relation(fields: [collectionId], references: [id])
-  license     License      @relation(fields: [licenseId], references: [id])
-  listingTags ListingTag[]
-  purchases   Purchase[]
-  downloads   Download[]
-  reviews     Review[]
-  favorites   Favorite[]
-  nft         Nft?
+  seller            User              @relation(fields: [sellerId], references: [id])
+  collection        Collection?       @relation(fields: [collectionId], references: [id])
+  license           License?          @relation(fields: [licenseId], references: [id])
+  listingCategories ListingCategory[]
+  listingTags       ListingTag[]
+  purchases         Purchase[]
+  downloads         Download[]
+  reviews           Review[]
+  favorites         Favorite[]
+  nft               Nft?
 
   @@map("listings")
+}
+
+model ListingCategory {
+  listingId  String @map("listing_id")
+  categoryId Int    @map("category_id")
+
+  listing  Listing  @relation(fields: [listingId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@id([listingId, categoryId])
+  @@map("listing_categories")
 }
 
 model ListingTag {
