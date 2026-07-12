@@ -85,9 +85,9 @@ describe('buildMintIntent', () => {
 })
 
 describe('confirmMint', () => {
-  it('re-verifies the mint on-chain and records the NFT with the derived id', async () => {
+  it('re-verifies the mint on-chain (with the asset-binding params) and records the NFT', async () => {
     listingFindFirst.mockResolvedValue(draftListing as never)
-    verifyMint.mockResolvedValue({ nftokenId: NFTOKEN_ID, issuer: 'rCreatorWallet' })
+    verifyMint.mockResolvedValue({ nftokenId: NFTOKEN_ID, issuer: 'rCreatorWallet', uriHex: 'AB' })
     nftCreate.mockResolvedValue({
       nftokenId: NFTOKEN_ID,
       issuer: 'rCreatorWallet',
@@ -97,7 +97,14 @@ describe('confirmMint', () => {
 
     const result = await confirmMint(CREATOR, 'listing-1', TX_HASH)
 
-    expect(verifyMint).toHaveBeenCalledWith({ txHash: TX_HASH.toUpperCase(), minters: ['rCreatorWallet'] })
+    const expectedUriHex = Buffer.from('ipfs://QmFileCid', 'utf8').toString('hex').toUpperCase()
+    expect(verifyMint).toHaveBeenCalledWith({
+      txHash: TX_HASH.toUpperCase(),
+      minters: ['rCreatorWallet'],
+      expectedUriHex,
+      expectedTaxon: 0,
+      expectedTransferFee: 2500,
+    })
     expect(nftCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ listingId: 'listing-1', nftokenId: NFTOKEN_ID, currentOwnerId: CREATOR }),
@@ -119,7 +126,7 @@ describe('confirmMint', () => {
 
   it('maps a duplicate mint (unique violation) to 409 ALREADY_TOKENIZED', async () => {
     listingFindFirst.mockResolvedValue(draftListing as never)
-    verifyMint.mockResolvedValue({ nftokenId: NFTOKEN_ID, issuer: 'rCreatorWallet' })
+    verifyMint.mockResolvedValue({ nftokenId: NFTOKEN_ID, issuer: 'rCreatorWallet', uriHex: 'AB' })
     nftCreate.mockRejectedValue({ code: 'P2002' })
     await expect(confirmMint(CREATOR, 'listing-1', TX_HASH)).rejects.toMatchObject({ status: 409, code: 'ALREADY_TOKENIZED' })
   })

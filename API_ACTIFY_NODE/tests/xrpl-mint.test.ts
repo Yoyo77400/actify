@@ -4,11 +4,17 @@ import { verifyXrplMint } from '../services/chains/xrpl-mint'
 const MINTER = 'rMinterAddress'
 const TX_HASH = 'A'.repeat(64)
 const NFTOKEN_ID = '000800001234567890ABCDEF'
+const URI_HEX = '697066733A2F2F516D46696C6543696400' // hex of an ipfs URI
+const TAXON = 0
+const TRANSFER_FEE = 2500
 
 const validMint = {
   validated: true,
   TransactionType: 'NFTokenMint',
   Account: MINTER,
+  URI: URI_HEX,
+  NFTokenTaxon: TAXON,
+  TransferFee: TRANSFER_FEE,
   meta: { TransactionResult: 'tesSUCCESS', nftoken_id: NFTOKEN_ID },
 }
 
@@ -19,7 +25,13 @@ function rpcResponse(result: unknown) {
 const fetchMock = vi.fn()
 
 function verify(minters = [MINTER]) {
-  return verifyXrplMint({ txHash: TX_HASH, minters })
+  return verifyXrplMint({
+    txHash: TX_HASH,
+    minters,
+    expectedUriHex: URI_HEX,
+    expectedTaxon: TAXON,
+    expectedTransferFee: TRANSFER_FEE,
+  })
 }
 
 beforeEach(() => {
@@ -35,7 +47,17 @@ afterEach(() => {
 describe('verifyXrplMint', () => {
   it('returns the on-chain NFTokenID and issuer for a valid mint by a linked wallet', async () => {
     fetchMock.mockResolvedValue(rpcResponse(validMint))
-    await expect(verify()).resolves.toEqual({ nftokenId: NFTOKEN_ID, issuer: MINTER })
+    await expect(verify()).resolves.toEqual({ nftokenId: NFTOKEN_ID, issuer: MINTER, uriHex: URI_HEX })
+  })
+
+  it('rejects a mint whose on-chain URI does not match the asset (binding check)', async () => {
+    fetchMock.mockResolvedValue(rpcResponse({ ...validMint, URI: '6F7468657200' }))
+    await expect(verify()).rejects.toMatchObject({ status: 400, code: 'TX_URI_MISMATCH' })
+  })
+
+  it('rejects a mint whose taxon or royalty does not match the intent', async () => {
+    fetchMock.mockResolvedValue(rpcResponse({ ...validMint, TransferFee: 9999 }))
+    await expect(verify()).rejects.toMatchObject({ status: 400, code: 'TX_PARAMS_MISMATCH' })
   })
 
   it('uses the explicit Issuer field when minting on behalf of another account', async () => {

@@ -9,11 +9,17 @@ export interface XrplMintInput {
   txHash: string
   /** Accounts allowed to have signed the mint (the creator's linked wallets). */
   minters: string[]
+  /** The exact NFTokenMint fields the backend told the wallet to mint, so the
+   *  on-chain token is bound to THIS asset (not any other NFT the creator owns). */
+  expectedUriHex: string
+  expectedTaxon: number
+  expectedTransferFee: number
 }
 
 export interface XrplMintResult {
   nftokenId: string
   issuer: string
+  uriHex: string
 }
 
 interface XrplTxResult {
@@ -22,6 +28,9 @@ interface XrplTxResult {
   TransactionType?: string
   Account?: string
   Issuer?: string
+  URI?: string
+  NFTokenTaxon?: number
+  TransferFee?: number
   meta?: { TransactionResult?: string; nftoken_id?: string }
 }
 
@@ -73,6 +82,20 @@ export async function verifyXrplMint(input: XrplMintInput): Promise<XrplMintResu
     throw new AppError(400, 'TX_FAILED', 'Le mint a échoué sur le ledger XRPL')
   }
 
+  // Bind the on-chain token to THIS asset: the mint must carry the exact URI
+  // (hex), taxon and royalty the backend issued in the intent. Otherwise a
+  // creator could confirm an unrelated NFTokenMint they own and misrepresent
+  // the asset's content to buyers.
+  if ((result.URI ?? '').toUpperCase() !== input.expectedUriHex.toUpperCase()) {
+    throw new AppError(400, 'TX_URI_MISMATCH', "Le NFT minté ne correspond pas au contenu de cet asset")
+  }
+  if ((result.NFTokenTaxon ?? 0) !== input.expectedTaxon) {
+    throw new AppError(400, 'TX_PARAMS_MISMATCH', 'Le taxon du NFT minté ne correspond pas')
+  }
+  if ((result.TransferFee ?? 0) !== input.expectedTransferFee) {
+    throw new AppError(400, 'TX_PARAMS_MISMATCH', 'Les royalties du NFT minté ne correspondent pas')
+  }
+
   const nftokenId = result.meta.nftoken_id
   if (!nftokenId) {
     throw new AppError(502, 'MINT_ID_MISSING', 'Impossible de lire le NFTokenID sur le ledger XRPL')
@@ -80,5 +103,5 @@ export async function verifyXrplMint(input: XrplMintInput): Promise<XrplMintResu
 
   // On a self-mint the issuer is the minting account; an explicit Issuer field
   // only appears when minting on behalf of another account.
-  return { nftokenId, issuer: result.Issuer ?? result.Account }
+  return { nftokenId, issuer: result.Issuer ?? result.Account, uriHex: result.URI ?? '' }
 }

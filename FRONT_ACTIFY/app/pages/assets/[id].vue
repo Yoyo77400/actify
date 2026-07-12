@@ -300,6 +300,7 @@ const priceLabel = computed(() => {
   const a = asset.value
   if (!a) return ''
   if (a.isFree) return 'Gratuit'
+  if (a.price == null) return 'Prix non défini'
   return `${a.price} ${a.currency ?? ''}`.trim()
 })
 

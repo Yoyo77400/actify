@@ -53,7 +53,7 @@
       <AssetMarketAssetCard v-for="asset in items" :key="asset.id" :asset="asset" />
     </div>
 
-    <div v-else-if="!loading" class="surface p-10 flex flex-col items-center gap-3 text-center">
+    <div v-else-if="!loading && !errorMsg" class="surface p-10 flex flex-col items-center gap-3 text-center">
       <Icon name="ph:package" class="text-3xl text-muted-2" />
       <p class="text-foreground font-medium">Aucun asset trouvé</p>
       <p class="text-muted text-sm">Essayez d'ajuster votre recherche ou vos filtres.</p>
@@ -128,17 +128,24 @@ if (firstError.value) {
   errorMsg.value = toApiError(firstError.value)?.message ?? 'Impossible de charger le catalogue.'
 }
 
+// Monotonic token: a slow append that resolves after a reset (user changed
+// filter/sort mid-load) is discarded instead of clobbering the new list.
+let requestSeq = 0
+
 async function fetchPage(reset: boolean) {
+  const seq = ++requestSeq
   loading.value = true
   errorMsg.value = null
   try {
     const batch = await assetsApi.list(buildParams())
+    if (seq !== requestSeq) return
     items.value = reset ? batch : [...items.value, ...batch]
     reachedEnd.value = batch.length < PAGE_SIZE
   } catch (err) {
+    if (seq !== requestSeq) return
     errorMsg.value = toApiError(err)?.message ?? 'Impossible de charger le catalogue.'
   } finally {
-    loading.value = false
+    if (seq === requestSeq) loading.value = false
   }
 }
 

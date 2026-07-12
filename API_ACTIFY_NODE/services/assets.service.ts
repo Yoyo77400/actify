@@ -165,6 +165,11 @@ export async function createAsset(userId: string, input: CreateAssetInput) {
     validateRoyaltyBps(input.royaltyBps)
   }
 
+  // A paid asset must carry a positive price, otherwise it can never be ordered.
+  if (!(input.isFree ?? false) && (input.basePrice == null || input.basePrice <= 0)) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Un asset payant doit avoir un prix supérieur à 0')
+  }
+
   const categoryIds = [...new Set(input.categoryIds ?? [])]
   await assertCategoriesExist(categoryIds)
 

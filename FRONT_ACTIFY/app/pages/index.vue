@@ -79,16 +79,21 @@ import type { AssetCard, CategoryWithCount } from '~/types/asset'
 const assetsApi = useAssets()
 
 // One SSR round-trip for the whole landing; each source degrades to an empty
-// list so a partial API outage still renders a coherent page.
+// list independently (allSettled) so a partial API outage still renders the
+// sections that did load rather than blanking the whole page.
 const { data } = await useAsyncData(
   'home-landing',
   async () => {
-    const [categories, latest, trending] = await Promise.all([
+    const [categories, latest, trending] = await Promise.allSettled([
       assetsApi.categories(),
       assetsApi.list({ sort: 'createdAt', limit: 8 }),
       assetsApi.list({ sort: 'views', limit: 8 }),
     ])
-    return { categories, latest, trending }
+    return {
+      categories: categories.status === 'fulfilled' ? categories.value : [],
+      latest: latest.status === 'fulfilled' ? latest.value : [],
+      trending: trending.status === 'fulfilled' ? trending.value : [],
+    }
   },
   {
     default: () => ({

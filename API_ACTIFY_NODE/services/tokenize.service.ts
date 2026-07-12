@@ -14,8 +14,22 @@ function isUniqueViolation(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === PRISMA_UNIQUE_VIOLATION
 }
 
+const NFT_TAXON = 0
+
 function stringToHex(input: string): string {
   return Buffer.from(input, 'utf8').toString('hex').toUpperCase()
+}
+
+// The single source of truth for the NFTokenMint an asset must carry, shared
+// by intent (what the wallet is told to sign) and confirm (what must match
+// on-chain). Deterministic from the listing.
+function mintParamsFor(listing: { id: string; fileIpfsCid: string | null; royaltyPercentage: unknown }) {
+  const royaltyPercent = listing.royaltyPercentage != null ? Number(listing.royaltyPercentage) : 0
+  const transferFee = Math.min(MAX_TRANSFER_FEE, Math.round(royaltyPercent * TRANSFER_FEE_PER_PERCENT))
+  // Point the NFT at its content when available, else a stable Actify
+  // reference. Not validated on-chain, so kept short (URI blob ≤ 256 bytes).
+  const uri = listing.fileIpfsCid ? `ipfs://${listing.fileIpfsCid}` : `actify:asset:${listing.id}`
+  return { uri, uriHex: stringToHex(uri), taxon: NFT_TAXON, transferFee }
 }
 
 async function getOwnedListingOrThrow(userId: string, listingId: string) {
@@ -49,19 +63,14 @@ export async function buildMintIntent(userId: string, listingId: string) {
     throw new AppError(409, 'ALREADY_TOKENIZED', 'Cet asset est déjà tokenisé')
   }
 
-  const royaltyPercent = listing.royaltyPercentage != null ? Number(listing.royaltyPercentage) : 0
-  const transferFee = Math.min(MAX_TRANSFER_FEE, Math.round(royaltyPercent * TRANSFER_FEE_PER_PERCENT))
-
-  // Point the NFT at its content when available, else at a stable Actify
-  // reference. Not validated on-chain, so kept short (URI blob ≤ 256 bytes).
-  const uri = listing.fileIpfsCid ? `ipfs://${listing.fileIpfsCid}` : `actify:asset:${listing.id}`
+  const params = mintParamsFor(listing)
 
   return {
-    nftokenTaxon: 0,
-    uri,
-    uriHex: stringToHex(uri),
+    nftokenTaxon: params.taxon,
+    uri: params.uri,
+    uriHex: params.uriHex,
     flags: FLAG_TRANSFERABLE,
-    transferFee,
+    transferFee: params.transferFee,
     minters: await getMinterAddresses(userId),
   }
 }
@@ -83,9 +92,17 @@ export async function confirmMint(userId: string, listingId: string, txHash: unk
   }
 
   const minters = await getMinterAddresses(userId)
-  const uri = listing.fileIpfsCid ? `ipfs://${listing.fileIpfsCid}` : `actify:asset:${listing.id}`
+  const params = mintParamsFor(listing)
 
-  const { nftokenId, issuer } = await verifyXrplMint({ txHash: normalizedTxHash, minters })
+  // Verify the on-chain mint AND that it carries this asset's exact URI/taxon/
+  // royalty — binding the token to the asset, not just to the creator.
+  const { nftokenId, issuer } = await verifyXrplMint({
+    txHash: normalizedTxHash,
+    minters,
+    expectedUriHex: params.uriHex,
+    expectedTaxon: params.taxon,
+    expectedTransferFee: params.transferFee,
+  })
 
   const nft = await prisma.nft
     .create({
@@ -93,8 +110,8 @@ export async function confirmMint(userId: string, listingId: string, txHash: unk
         listingId: listing.id,
         nftokenId,
         issuer,
-        taxon: 0,
-        uri,
+        taxon: params.taxon,
+        uri: params.uri,
         mintTxHash: normalizedTxHash,
         currentOwnerId: userId,
       },
