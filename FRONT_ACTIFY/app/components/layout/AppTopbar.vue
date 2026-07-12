@@ -1,10 +1,9 @@
 <script setup lang="ts">
-  const item = {
-    label: 'Connect',
-    to: '/auth/login',
-    icon: 'user',
-  }
+const { user, isLoggedIn, logout } = useAuth()
+
+const displayName = computed(() => user.value?.displayName || user.value?.username || 'Mon compte')
 </script>
+
 <template>
   <header class="flex items-center justify-between gap-[18px] mb-[18px] max-md:flex-col max-md:items-stretch">
     <div class="surface--soft min-w-[280px] w-[min(100%,360px)] h-11 px-3 flex items-center gap-2.5 max-md:w-full">
@@ -18,19 +17,24 @@
     </div>
 
     <div class="flex items-center gap-2.5 max-md:justify-end">
-      <NuxtLink
-        :key="item.label"
-        :to="item.to"
-        :class="'ghost-btn'"
-        :title="item.label"
-      >
-      Connect Wallet
+      <template v-if="isLoggedIn">
+        <NuxtLink to="/profile" class="ghost-btn flex items-center gap-2" title="Mon profil">
+          <Icon name="ph:user-circle" class="text-lg" />
+          <span class="max-md:hidden">{{ displayName }}</span>
+        </NuxtLink>
+        <button
+          class="w-10 h-10 rounded-full border border-line bg-panel text-foreground hover:text-red-400"
+          type="button"
+          aria-label="Se déconnecter"
+          title="Se déconnecter"
+          @click="logout"
+        >
+          <Icon name="ph:sign-out" class="text-lg" />
+        </button>
+      </template>
+      <NuxtLink v-else to="/auth/login" class="ghost-btn" title="Se connecter">
+        Connect Wallet
       </NuxtLink>
-      <button
-        class="w-10 h-10 rounded-full border border-line bg-panel text-foreground"
-        type="button"
-        aria-label="Aide"
-      >◎</button>
     </div>
   </header>
 </template>

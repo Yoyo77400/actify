@@ -59,7 +59,7 @@ import {
   adminDismissReport
 } from '~/composables/useAdminApi'
 
-definePageMeta({ layout: 'admin' })
+definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: 'Dashboard' })
 
 const { data } = await useAdminDashboard()
