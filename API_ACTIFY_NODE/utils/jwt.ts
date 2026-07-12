@@ -6,7 +6,9 @@ if (!process.env.JWT_SECRET) {
 
 const JWT_SECRET = process.env.JWT_SECRET
 const ACCESS_TOKEN_TTL = '15m'
-const REFRESH_TOKEN_TTL = '30d'
+// Kept short while refresh tokens are stateless (no server-side revocation):
+// a leaked token stays usable for the full TTL. Revisit with the session store.
+const REFRESH_TOKEN_TTL = '7d'
 
 export function signAccessToken(userId: string): string {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL })

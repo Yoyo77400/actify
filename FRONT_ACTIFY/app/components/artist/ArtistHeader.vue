@@ -1,6 +1,6 @@
 <template>
   <section class="surface relative overflow-hidden min-h-[320px] mb-[18px]">
-    <img class="absolute inset-0 w-full h-full object-cover brightness-[0.42]" :src="artist.cover" :alt="artist.displayName" />
+    <img class="absolute inset-0 w-full h-full object-cover brightness-[0.42]" :src="artist.cover" :alt="artist.displayName" >
     <div
       class="absolute inset-0"
       style="background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.74))"
@@ -12,7 +12,7 @@
           class="w-[92px] h-[92px] rounded-full object-cover border-2 border-white/18"
           :src="artist.avatar"
           :alt="artist.displayName"
-        />
+        >
         <div>
           <h1 class="ethnocentric m-0 text-[clamp(28px,4vw,44px)]">{{ artist.displayName }}</h1>
           <div class="flex gap-2.5 flex-wrap mt-2.5">

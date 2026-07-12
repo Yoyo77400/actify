@@ -1,7 +1,7 @@
 <template>
   <article class="surface overflow-hidden">
     <NuxtLink :to="`/assets/${item.id}`">
-      <img class="w-full h-[230px] object-cover bg-[#f1f3f7]" :src="item.image" :alt="item.name" />
+      <img class="w-full h-[230px] object-cover bg-[#f1f3f7]" :src="item.image" :alt="item.name" >
     </NuxtLink>
 
     <div class="p-3.5">

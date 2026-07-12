@@ -122,67 +122,69 @@ export const homeMock: HomePayload = {
   }
 }
 
-export const artistMock: Record<string, ArtistPayload> = {
-  ethan22: {
-    artist: {
-      slug: 'ethan22',
-      displayName: '#ETHAN22',
-      username: '@ethan22',
-      avatar: 'https://picsum.photos/seed/ethan22avatar/200/200',
-      cover: artistCover,
-      joinedAt: 'Joined Jan 2025',
-      wallet: '#183HSN928...',
-      bio: 'Créateur de visuels et modèles 3D orientés event, collectibles et licences digitales.',
-      followersLabel: '1.3k followers'
-    },
-    collections: [
-      {
-        id: 'mountain-of-hell-collection-1',
-        name: 'Mountain of Hell 25/26',
-        image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
-        description: 'A collection of 3D models and pictures to celebrate the 25/26 edition of Mountain of Hell.',
-        buttonLabel: 'View'
-      },
-      {
-        id: 'mountain-of-hell-collection-2',
-        name: 'Mountain of Hell 25/26',
-        image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
-        description: 'A collection of 3D models and pictures to celebrate the 25/26 edition of Mountain of Hell.',
-        buttonLabel: 'View'
-      },
-      {
-        id: 'mountain-of-hell-collection-3',
-        name: 'Mountain of Hell 25/26',
-        image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
-        description: 'A collection of 3D models and pictures to celebrate the 25/26 edition of Mountain of Hell.',
-        buttonLabel: 'View'
-      },
-      {
-        id: 'mountain-of-hell-collection-4',
-        name: 'Mountain of Hell 25/26',
-        image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
-        description: 'A collection of 3D models and pictures to celebrate the 25/26 edition of Mountain of Hell.',
-        buttonLabel: 'View'
-      }
-    ],
-    items: Array.from({ length: 6 }).map((_, index) => ({
-      id: `mountain-of-hell-${index + 1}`,
+const ethan22Artist: ArtistPayload = {
+  artist: {
+    slug: 'ethan22',
+    displayName: '#ETHAN22',
+    username: '@ethan22',
+    avatar: 'https://picsum.photos/seed/ethan22avatar/200/200',
+    cover: artistCover,
+    joinedAt: 'Joined Jan 2025',
+    wallet: '#183HSN928...',
+    bio: 'Créateur de visuels et modèles 3D orientés event, collectibles et licences digitales.',
+    followersLabel: '1.3k followers'
+  },
+  collections: [
+    {
+      id: 'mountain-of-hell-collection-1',
       name: 'Mountain of Hell 25/26',
-      image: assetImage,
-      cover: assetImage,
-      price: '25.99',
-      currency: '$',
-      statusLabel: index === 4 ? 'Inactive' : 'Active',
-      active: index !== 4,
-      description: 'A licensable digital creation linked to the Mountain of Hell 25/26 universe.',
-      creator: 'ethan22',
-      contract: '01023920102020',
-      chain: 'SOL',
-      popularity: 3,
-      salesCount: 27,
-      lastSaleLabel: '01/12/25'
-    }))
-  }
+      image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
+      description: 'A collection of 3D models and pictures to celebrate the 25/26 edition of Mountain of Hell.',
+      buttonLabel: 'View'
+    },
+    {
+      id: 'mountain-of-hell-collection-2',
+      name: 'Mountain of Hell 25/26',
+      image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
+      description: 'A collection of 3D models and pictures to celebrate the 25/26 edition of Mountain of Hell.',
+      buttonLabel: 'View'
+    },
+    {
+      id: 'mountain-of-hell-collection-3',
+      name: 'Mountain of Hell 25/26',
+      image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
+      description: 'A collection of 3D models and pictures to celebrate the 25/26 edition of Mountain of Hell.',
+      buttonLabel: 'View'
+    },
+    {
+      id: 'mountain-of-hell-collection-4',
+      name: 'Mountain of Hell 25/26',
+      image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80',
+      description: 'A collection of 3D models and pictures to celebrate the 25/26 edition of Mountain of Hell.',
+      buttonLabel: 'View'
+    }
+  ],
+  items: Array.from({ length: 6 }).map((_, index) => ({
+    id: `mountain-of-hell-${index + 1}`,
+    name: 'Mountain of Hell 25/26',
+    image: assetImage,
+    cover: assetImage,
+    price: '25.99',
+    currency: '$',
+    statusLabel: index === 4 ? 'Inactive' : 'Active',
+    active: index !== 4,
+    description: 'A licensable digital creation linked to the Mountain of Hell 25/26 universe.',
+    creator: 'ethan22',
+    contract: '01023920102020',
+    chain: 'SOL',
+    popularity: 3,
+    salesCount: 27,
+    lastSaleLabel: '01/12/25'
+  }))
+}
+
+export const artistMock: Record<string, ArtistPayload> = {
+  ethan22: ethan22Artist
 }
 
 export const assetMock: Record<string, AssetDetailPayload> = {
@@ -194,14 +196,14 @@ export const assetMock: Record<string, AssetDetailPayload> = {
       { id: 'orders', label: 'Orders' },
       { id: 'activity', label: 'Activity' }
     ],
-    asset: artistMock.ethan22.items[0]
+    asset: ethan22Artist.items[0]!
   }
 }
 
-export function getArtistMock(slug: string): ArtistPayload | undefined {
-  return artistMock[slug] ?? artistMock.ethan22
+export function getArtistMock(slug: string): ArtistPayload {
+  return artistMock[slug] ?? ethan22Artist
 }
 
 export function getAssetMock(id: string): AssetDetailPayload | undefined {
-  return assetMock[id] 
+  return assetMock[id]
 }

@@ -6,6 +6,7 @@ import { signAccessToken, signRefreshToken } from '../utils/jwt'
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000
 const DEFAULT_ROLE_NAME = 'user'
+const ADMIN_ROLE_NAME = 'admin'
 
 export interface ChallengeInput {
   address: string
@@ -43,11 +44,30 @@ function serializeWallet(wallet: {
   }
 }
 
-async function getDefaultRoleId(): Promise<number> {
-  const existing = await prisma.role.findFirst({ where: { name: DEFAULT_ROLE_NAME } })
+async function getRoleId(name: string): Promise<number> {
+  const existing = await prisma.role.findFirst({ where: { name } })
   if (existing) return existing.id
-  const created = await prisma.role.create({ data: { name: DEFAULT_ROLE_NAME } })
+  const created = await prisma.role.create({ data: { name } })
   return created.id
+}
+
+// Bootstrap the platform admin from ADMIN_WALLET_ADDRESS: whenever that exact
+// wallet authenticates, its account is (re)promoted to admin — works even for
+// the very first login before any account exists. No env set → no-op.
+async function promoteIfAdminWallet(
+  user: { id: string; role: { name: string } },
+  address: string,
+): Promise<{ id: string; username: string | null; role: { name: string } }> {
+  const adminAddress = process.env.ADMIN_WALLET_ADDRESS?.trim()
+  if (!adminAddress || address !== adminAddress || user.role.name === ADMIN_ROLE_NAME) {
+    return user as { id: string; username: string | null; role: { name: string } }
+  }
+  const adminRoleId = await getRoleId(ADMIN_ROLE_NAME)
+  return prisma.user.update({
+    where: { id: user.id },
+    data: { roleId: adminRoleId },
+    include: { role: true },
+  })
 }
 
 export async function createChallenge(input: ChallengeInput) {
@@ -134,7 +154,7 @@ export async function verifyChallenge(input: VerifyInput, authenticatedUserId: s
 
   if (!user) {
     isNewAccount = true
-    const roleId = await getDefaultRoleId()
+    const roleId = await getRoleId(DEFAULT_ROLE_NAME)
     user = await prisma.user.create({
       data: {
         roleId,
@@ -151,12 +171,14 @@ export async function verifyChallenge(input: VerifyInput, authenticatedUserId: s
     throw new AppError(403, 'USER_BANNED', 'Compte banni')
   }
 
+  const finalUser = await promoteIfAdminWallet(user, input.address)
+
   return {
     mode: 'authenticated' as const,
     isNewAccount,
-    accessToken: signAccessToken(user.id),
-    refreshToken: signRefreshToken(user.id),
-    user: { id: user.id, username: user.username, role: user.role.name },
+    accessToken: signAccessToken(finalUser.id),
+    refreshToken: signRefreshToken(finalUser.id),
+    user: { id: finalUser.id, username: finalUser.username, role: finalUser.role.name },
   }
 }
 

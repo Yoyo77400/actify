@@ -4,7 +4,7 @@
       class="absolute inset-0 w-full h-full object-cover brightness-[0.42]"
       :src="user.cover"
       :alt="user.displayName"
-    />
+    >
     <div
       class="absolute inset-0"
       style="background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.74))"
@@ -16,7 +16,7 @@
           class="w-[92px] h-[92px] rounded-full object-cover border-2 border-white/18"
           :src="user.avatar"
           :alt="user.displayName"
-        />
+        >
         <div class="flex-1 min-w-0">
           <h1 class="ethnocentric m-0 text-[clamp(24px,3.5vw,38px)]">{{ user.displayName }}</h1>
           <p class="m-0 mt-1 text-muted text-sm">{{ user.username }}</p>

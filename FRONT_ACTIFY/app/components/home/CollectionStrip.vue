@@ -6,7 +6,7 @@
       class="strip-card surface flex justify-between items-center gap-3 p-3.5 cursor-pointer"
     >
       <div class="flex items-center gap-2.5">
-        <img class="w-9 h-9 rounded-[10px] object-cover" :src="item.image" :alt="item.name" />
+        <img class="w-9 h-9 rounded-[10px] object-cover" :src="item.image" :alt="item.name" >
         <div>
           <h3 class="ethnocentric m-0 text-sm">
             {{ item.name }}

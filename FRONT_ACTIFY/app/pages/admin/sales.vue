@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { adminCancelSale, adminRefundSale, adminDeleteSale } from '~/composables/useAdminApi'
 
-definePageMeta({ layout: 'admin' })
+definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: 'Sales' })
 
 const store = useAdminStore()

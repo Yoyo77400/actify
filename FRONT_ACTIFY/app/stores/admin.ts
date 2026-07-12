@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import type { AdminUser, AdminSale, AdminAsset, AdminReport } from '~/types/admin'
 
 export const useAdminStore = defineStore('admin', () => {
@@ -9,11 +9,11 @@ export const useAdminStore = defineStore('admin', () => {
   const reportFilter = ref<'all' | 'open' | 'reviewing' | 'resolved' | 'dismissed'>('all')
 
   // confirm modal state
-  const confirmAction = ref<(() => Promise<void>) | null>(null)
+  const confirmAction = ref<(() => Promise<unknown>) | null>(null)
   const confirmMessage = ref('')
   const confirmOpen = ref(false)
 
-  function requestConfirm(message: string, action: () => Promise<void>) {
+  function requestConfirm(message: string, action: () => Promise<unknown>) {
     confirmMessage.value = message
     confirmAction.value = action
     confirmOpen.value = true

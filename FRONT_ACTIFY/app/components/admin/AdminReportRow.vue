@@ -13,7 +13,7 @@
       <p class="m-0 text-xs text-muted-2 mt-1">by {{ report.reportedBy }} · {{ formattedDate }}</p>
     </div>
 
-    <div class="flex gap-2 shrink-0" v-if="report.status === 'open' || report.status === 'reviewing'">
+    <div v-if="report.status === 'open' || report.status === 'reviewing'" class="flex gap-2 shrink-0">
       <button
         class="ghost-btn text-xs text-success"
         type="button"

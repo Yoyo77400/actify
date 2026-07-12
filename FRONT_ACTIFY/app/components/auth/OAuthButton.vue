@@ -1,8 +1,9 @@
 <template>
   <button
-    class="w-full flex items-center justify-center gap-3 h-12 rounded-xl border transition-all duration-200"
+    class="w-full flex items-center justify-center gap-3 h-12 rounded-xl border transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
     :class="styles.button"
-    :disabled="loading"
+    :disabled="loading || disabled"
+    :title="disabled ? 'Bientôt disponible' : undefined"
     @click="$emit('click')"
   >
     <Icon :name="styles.icon" class="text-xl shrink-0" />
@@ -16,6 +17,7 @@ type Provider = 'google' | 'github'
 const props = defineProps<{
   provider: Provider
   loading?: boolean
+  disabled?: boolean
 }>()
 
 defineEmits<{

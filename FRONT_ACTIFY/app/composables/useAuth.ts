@@ -1,31 +1,22 @@
-import type { User } from '~/types/marketplace'
+import type { MeProfile } from '~/types/auth'
 
 export function useAuth() {
   const store = useAuthStore()
+  const api = useApi()
   const { user, isLoggedIn } = storeToRefs(store)
 
-  async function mockLogin(provider: 'google' | 'github') {
-    // simule un délai de connexion OAuth
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const { data } = await useFetch<User>('https://ipfs.io/ipns/k51qzi5uqu5dgceyd3jw1frpcnqbd4thybutzgn6u8h6lus91op97lm964b29c')
-    if (data.value) {
-      store.setUser({
-        ...data.value,
-        // personnalise selon le provider pour le mock
-        email: provider === 'github'
-          ? 'fouad@github.com'
-          : 'fouad@gmail.com'
-      })
-    }
-
-    await navigateTo('/')
+  async function fetchMe(): Promise<MeProfile> {
+    const me = await api.get<MeProfile>('/users/me')
+    store.setUser(me)
+    return me
   }
 
+  // Tokens are stateless (no server-side session yet), so logging out is
+  // purely local: drop the cookies and the in-memory profile.
   function logout() {
-    store.logout()
+    store.clearSession()
     navigateTo('/auth/login')
   }
 
-  return { user, isLoggedIn, mockLogin, logout }
+  return { user, isLoggedIn, fetchMe, logout }
 }

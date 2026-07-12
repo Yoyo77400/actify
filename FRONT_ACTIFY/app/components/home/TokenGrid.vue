@@ -6,7 +6,7 @@
       class="token-card surface flex justify-between gap-3 p-3.5 cursor-pointer"
     >
       <div class="flex items-center gap-2.5">
-        <img class="w-[38px] h-[38px] rounded-full object-cover" :src="token.image" :alt="token.name" />
+        <img class="w-[38px] h-[38px] rounded-full object-cover" :src="token.image" :alt="token.name" >
         <div>
           <h3 class="ethnocentric m-0 text-sm">{{ token.name }}</h3>
           <p class="mt-1 mb-0 text-xs text-muted">{{ token.priceLabel }}</p>

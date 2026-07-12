@@ -40,8 +40,9 @@ const ui = useMarketplaceUiStore()
 
 watchEffect(() => {
   const valid = props.tabs.some((tab) => tab.id === ui.assetTab)
-  if (!valid && props.tabs.length > 0) {
-    ui.setAssetTab(props.tabs[0].id)
+  const firstTab = props.tabs[0]
+  if (!valid && firstTab) {
+    ui.setAssetTab(firstTab.id)
   }
 })
 </script>
