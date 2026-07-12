@@ -309,6 +309,24 @@ describe('listOrders', () => {
     expect(meta.total).toBe(1)
     expect(purchaseFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { status: 'Confirmed' } }))
   })
+
+  it('masks the internal pending:<uuid> placeholder as null', async () => {
+    purchaseFindMany.mockResolvedValue([
+      {
+        id: 'p2',
+        buyer: { id: 'u1', username: 'alice', displayName: null },
+        listing: { id: 'l1', title: 'Neon Pack', slug: 'neon-pack' },
+        txHash: 'pending:00000000-0000-0000-0000-000000000000',
+        amountPaid: '5',
+        status: 'Pending',
+        purchasedAt: new Date('2026-07-10'),
+      },
+    ] as never)
+    purchaseCount.mockResolvedValue(1)
+
+    const { items } = await listOrders({}, pagination)
+    expect(items[0]!.txHash).toBeNull()
+  })
 })
 
 describe('getAdminStats', () => {

@@ -188,6 +188,12 @@ model Purchase {
   txHash      String   @unique @map("tx_hash")
   amountPaid  Decimal  @map("amount_paid")
   status      String   @default("Pending")
+  // Payment target snapshotted at order creation: the seller's wallet address
+  // and a per-order XRPL DestinationTag. Confirmation requires the on-chain tx
+  // to carry this exact tag, which binds a payment to this specific order
+  // (prevents replaying any other payment to the same seller).
+  paymentAddress String? @map("payment_address")
+  paymentTag     Int?    @map("payment_tag")
   purchasedAt DateTime @default(now()) @map("purchased_at")
 
   buyer   User    @relation(fields: [buyerId], references: [id])

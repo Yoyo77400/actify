@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { verifyXrplPayment } from '../services/chains/xrpl-payment'
 
 const DESTINATION = 'rSellerAddress'
+const DESTINATION_TAG = 42
 const TX_HASH = 'ABC123'
 const FIVE_XRP_IN_DROPS = '5000000'
 
@@ -9,6 +10,7 @@ const validPayment = {
   validated: true,
   TransactionType: 'Payment',
   Destination: DESTINATION,
+  DestinationTag: DESTINATION_TAG,
   meta: { TransactionResult: 'tesSUCCESS', delivered_amount: FIVE_XRP_IN_DROPS },
 }
 
@@ -19,7 +21,7 @@ function rpcResponse(result: unknown) {
 const fetchMock = vi.fn()
 
 function verify(minAmountXrp = 5) {
-  return verifyXrplPayment({ txHash: TX_HASH, destination: DESTINATION, minAmountXrp })
+  return verifyXrplPayment({ txHash: TX_HASH, destination: DESTINATION, destinationTag: DESTINATION_TAG, minAmountXrp })
 }
 
 beforeEach(() => {
@@ -33,7 +35,7 @@ afterEach(() => {
 })
 
 describe('verifyXrplPayment', () => {
-  it('resolves for a validated successful payment to the right address', async () => {
+  it('resolves for a validated successful payment to the right address and tag', async () => {
     fetchMock.mockResolvedValue(rpcResponse(validPayment))
     await expect(verify()).resolves.toBeUndefined()
     expect(fetchMock).toHaveBeenCalledWith('https://s.altnet.rippletest.net:51234/', {
@@ -50,15 +52,25 @@ describe('verifyXrplPayment', () => {
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:5005/', expect.anything())
   })
 
-  it('falls back to top-level DeliveredAmount when meta.delivered_amount is absent', async () => {
+  it('reads the legacy meta.DeliveredAmount when delivered_amount is absent', async () => {
     fetchMock.mockResolvedValue(
       rpcResponse({
         ...validPayment,
-        DeliveredAmount: FIVE_XRP_IN_DROPS,
-        meta: { TransactionResult: 'tesSUCCESS' },
+        meta: { TransactionResult: 'tesSUCCESS', DeliveredAmount: FIVE_XRP_IN_DROPS },
       }),
     )
     await expect(verify()).resolves.toBeUndefined()
+  })
+
+  it('rejects a payment carrying the wrong DestinationTag (bound to another order)', async () => {
+    fetchMock.mockResolvedValue(rpcResponse({ ...validPayment, DestinationTag: 999 }))
+    await expect(verify()).rejects.toMatchObject({ status: 400, code: 'TX_WRONG_TAG' })
+  })
+
+  it('rejects a payment with no DestinationTag', async () => {
+    const { DestinationTag: _tag, ...noTag } = validPayment
+    fetchMock.mockResolvedValue(rpcResponse(noTag))
+    await expect(verify()).rejects.toMatchObject({ status: 400, code: 'TX_WRONG_TAG' })
   })
 
   it('rejects a transaction not yet validated', async () => {
@@ -113,8 +125,18 @@ describe('verifyXrplPayment', () => {
     await expect(verify()).rejects.toMatchObject({ status: 502, code: 'TX_LOOKUP_FAILED' })
   })
 
-  it('rejects when the RPC endpoint answers with an HTTP error', async () => {
-    fetchMock.mockResolvedValue({ ok: false })
+  it('maps an HTTP error from the RPC endpoint to 502 TX_LOOKUP_FAILED', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 503 })
+    await expect(verify()).rejects.toMatchObject({ status: 502, code: 'TX_LOOKUP_FAILED' })
+  })
+
+  it('maps a network failure (fetch rejects) to 502 TX_LOOKUP_FAILED', async () => {
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'))
+    await expect(verify()).rejects.toMatchObject({ status: 502, code: 'TX_LOOKUP_FAILED' })
+  })
+
+  it('maps a malformed JSON body to 502 TX_LOOKUP_FAILED', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => { throw new SyntaxError('bad json') } })
     await expect(verify()).rejects.toMatchObject({ status: 502, code: 'TX_LOOKUP_FAILED' })
   })
 })

@@ -47,6 +47,8 @@ function serializeAssetCard(listing: AssetCardRow) {
   }
 }
 
+// Public serializer: deliberately omits `role` — exposing it on an
+// unauthenticated endpoint would let anyone enumerate admin accounts.
 function serializeCreatorProfile(user: {
   id: string
   username: string | null
@@ -55,7 +57,6 @@ function serializeCreatorProfile(user: {
   avatarCid: string | null
   isVerified: boolean
   createdAt: Date
-  role: { name: string }
 }) {
   return {
     id: user.id,
@@ -63,7 +64,6 @@ function serializeCreatorProfile(user: {
     displayName: user.displayName,
     bio: user.bio,
     avatarCid: user.avatarCid,
-    role: user.role.name,
     isVerified: user.isVerified,
     createdAt: user.createdAt,
   }
@@ -96,6 +96,7 @@ async function searchAssets(q: string, pagination: Pagination) {
 async function searchCreators(q: string, pagination: Pagination) {
   const where: Record<string, unknown> = {
     deletedAt: null,
+    isBanned: false,
     OR: [
       { username: { contains: q, mode: 'insensitive' } },
       { displayName: { contains: q, mode: 'insensitive' } },
@@ -105,7 +106,6 @@ async function searchCreators(q: string, pagination: Pagination) {
   const [rows, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      include: { role: true },
       orderBy: { createdAt: 'desc' },
       skip: pagination.skip,
       take: pagination.limit,
@@ -163,7 +163,7 @@ export async function getSuggestions(q: string | undefined) {
       take: SUGGESTION_LIMIT,
     }),
     prisma.user.findMany({
-      where: { deletedAt: null, username: { contains: term, mode: 'insensitive' } },
+      where: { deletedAt: null, isBanned: false, username: { contains: term, mode: 'insensitive' } },
       select: { username: true },
       orderBy: { username: 'asc' },
       take: SUGGESTION_LIMIT,

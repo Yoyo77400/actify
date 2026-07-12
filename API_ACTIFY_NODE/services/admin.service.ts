@@ -5,6 +5,9 @@ import type { Pagination } from '../utils/pagination'
 const ARCHIVED = 'Archived'
 const CONFIRMED = 'Confirmed'
 const ADMIN_ROLE = 'admin'
+// Mirrors orders.service: Pending/Cancelled orders carry a 'pending:<uuid>'
+// placeholder in tx_hash until a real payment confirms them.
+const PENDING_TX_PREFIX = 'pending:'
 const ASSET_STATUSES = ['Draft', 'Published', 'Archived', 'Suspended']
 const STATS_ASSET_STATUSES = ['Draft', 'Published', 'Archived']
 
@@ -232,7 +235,8 @@ export async function listOrders(filters: AdminOrderFilters, pagination: Paginat
       id: purchase.id,
       buyer: purchase.buyer,
       listing: purchase.listing,
-      txHash: purchase.txHash,
+      // Mask the internal 'pending:<uuid>' placeholder like the buyer-facing API.
+      txHash: purchase.txHash.startsWith(PENDING_TX_PREFIX) ? null : purchase.txHash,
       amountPaid: Number(purchase.amountPaid),
       status: purchase.status,
       purchasedAt: purchase.purchasedAt,

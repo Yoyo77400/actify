@@ -42,7 +42,6 @@ const creatorRow = {
   avatarCid: null,
   isVerified: true,
   createdAt: new Date('2026-06-01'),
-  role: { name: 'creator' },
 }
 
 beforeEach(() => {
@@ -109,6 +108,7 @@ describe('search', () => {
 
     const { results, meta } = await search({ q: 'bo', type: 'creators' }, pagination)
 
+    // Public serializer must NOT leak `role` (admin enumeration).
     expect(results.creators).toEqual([
       {
         id: 'user-2',
@@ -116,7 +116,6 @@ describe('search', () => {
         displayName: 'Bob',
         bio: null,
         avatarCid: null,
-        role: 'creator',
         isVerified: true,
         createdAt: creatorRow.createdAt,
       },
@@ -125,10 +124,12 @@ describe('search', () => {
     expect(meta).toEqual({ page: 1, limit: 20, total: 3, totalPages: 1 })
     expect(listingFindMany).not.toHaveBeenCalled()
 
+    // Banned users are excluded from public search.
     expect(userFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           deletedAt: null,
+          isBanned: false,
           OR: [
             { username: { contains: 'bo', mode: 'insensitive' } },
             { displayName: { contains: 'bo', mode: 'insensitive' } },
@@ -172,6 +173,8 @@ describe('getSuggestions', () => {
     })
     expect(listingFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }))
     expect(tagFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }))
-    expect(userFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }))
+    expect(userFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ isBanned: false }), take: 5 }),
+    )
   })
 })

@@ -275,6 +275,8 @@ Le wallet est l'unique moyen de connexion : `challenge` + `verify` font office d
 
 > Pas de `policyId` tant que les License Policies ne sont pas implémentées : le prix est celui du listing.
 
+> Seuls les listings en `currency: "XRP"` et de prix > 0 sont commandables (seul XRP natif est vérifiable on-chain aujourd'hui).
+
 **Réponse (inclut les infos pour le paiement on-chain) :**
 ```json
 {
@@ -283,11 +285,14 @@ Le wallet est l'unique moyen de connexion : `challenge` + `verify` font office d
   "amount": 5.0,
   "currency": "XRP",
   "paymentAddress": "rXXX...sellerPrimaryWallet",
+  "paymentTag": 3829104733,
   "expiresAt": "2026-07-11T14:30:00Z"
 }
 ```
 
-**`POST /orders/:id/confirm`** — body `{ "txHash": "..." }`. Le serveur vérifie la transaction **on-chain** via le JSON-RPC XRPL (`XRPL_RPC_URL`, Testnet par défaut) : tx validée (`tesSUCCESS`), type `Payment`, destination = wallet primaire du vendeur, `delivered_amount` ≥ prix en drops. Un `txHash` déjà utilisé est rejeté (409 `TX_ALREADY_USED`).
+> `paymentAddress` et `paymentTag` sont **figés à la création** de la commande. L'acheteur DOIT envoyer le paiement XRP avec ce **DestinationTag** : c'est lui qui lie le paiement à cette commande précise (sans tag, n'importe quel paiement vers le vendeur pourrait être rejoué pour confirmer une commande).
+
+**`POST /orders/:id/confirm`** — body `{ "txHash": "..." }` (64 caractères hexadécimaux, normalisé en majuscules). Le serveur vérifie la transaction **on-chain** via le JSON-RPC XRPL (`XRPL_RPC_URL`, Testnet par défaut) : tx validée (`tesSUCCESS`), type `Payment`, destination = `paymentAddress` figée, **`DestinationTag` = `paymentTag`**, `delivered_amount` ≥ prix en drops. Le stock d'un asset `limited` est re-vérifié au confirm (anti-survente). Un `txHash` déjà utilisé est rejeté (409 `TX_ALREADY_USED`).
 
 ---
 
@@ -683,9 +688,13 @@ Le wallet est l'unique moyen de connexion : `challenge` + `verify` font office d
 | `ORDER_NOT_PENDING` | 409 | La commande n'est plus en attente (déjà confirmée/annulée) |
 | `TX_NOT_FOUND` | 404 | Transaction introuvable sur le ledger |
 | `TX_NOT_VALIDATED` | 400 | Transaction pas encore validée par le ledger |
+| `TX_NOT_PAYMENT` | 400 | La transaction n'est pas un paiement XRPL |
 | `TX_WRONG_DESTINATION` | 400 | Le paiement ne cible pas le wallet du vendeur |
+| `TX_WRONG_TAG` | 400 | Le DestinationTag ne correspond pas à cette commande |
+| `TX_FAILED` | 400 | La transaction a échoué sur le ledger (résultat ≠ tesSUCCESS) |
 | `TX_AMOUNT_TOO_LOW` | 400 | Montant on-chain inférieur au prix |
 | `TX_ALREADY_USED` | 409 | Ce hash de transaction a déjà confirmé une commande |
+| `TX_LOOKUP_FAILED` | 502 | Nœud XRPL injoignable / réponse invalide |
 
 ### Headers personnalisés
 

@@ -9,7 +9,7 @@ export async function request(req: Request, res: Response) {
 }
 
 export async function downloadByToken(req: Request, res: Response) {
-  const url = downloadsService.resolveDownloadUrl(String(req.params.token))
+  const url = await downloadsService.resolveDownloadUrl(String(req.params.token))
   // Allowed exception to the sendSuccess envelope: the deliverable is a 302
   // redirect to the IPFS gateway, not JSON.
   res.redirect(url)

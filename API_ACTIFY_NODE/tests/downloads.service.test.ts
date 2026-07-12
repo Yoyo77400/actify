@@ -3,41 +3,38 @@ import jwt from 'jsonwebtoken'
 
 vi.mock('../services/prisma', () => ({
   prisma: {
+    user: { findUnique: vi.fn() },
     listing: { findFirst: vi.fn() },
     purchase: { findFirst: vi.fn() },
-    download: { count: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+    download: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), count: vi.fn() },
   },
 }))
 
 import { prisma } from '../services/prisma'
 import { listMyDownloads, requestDownload, resolveDownloadUrl } from '../services/downloads.service'
 
+const userFindUnique = vi.mocked(prisma.user.findUnique)
 const listingFindFirst = vi.mocked(prisma.listing.findFirst)
 const purchaseFindFirst = vi.mocked(prisma.purchase.findFirst)
-const downloadCount = vi.mocked(prisma.download.count)
-const downloadCreate = vi.mocked(prisma.download.create)
+const downloadFindFirst = vi.mocked(prisma.download.findFirst)
 const downloadFindMany = vi.mocked(prisma.download.findMany)
+const downloadCreate = vi.mocked(prisma.download.create)
+const downloadCount = vi.mocked(prisma.download.count)
 
 const JWT_SECRET = process.env.JWT_SECRET!
 const ONE_HOUR_MS = 60 * 60 * 1000
 const CLOCK_TOLERANCE_MS = 2000
 
-const freeListing = {
-  id: 'listing-1',
-  isFree: true,
-  maxDownloads: null,
-  fileIpfsCid: 'QmCid',
-}
+const activeUser = { id: 'user-1', deletedAt: null, isBanned: false }
+const freeListing = { id: 'listing-1', isFree: true, maxDownloads: null, fileIpfsCid: 'QmCid' }
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('requestDownload', () => {
-  beforeEach(() => {
-    listingFindFirst.mockReset()
-    purchaseFindFirst.mockReset()
-    downloadCount.mockReset()
-    downloadCreate.mockReset()
-  })
-
   it('issues a signed download token for a free listing', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
     listingFindFirst.mockResolvedValue(freeListing as never)
     downloadCreate.mockResolvedValue({} as never)
 
@@ -47,13 +44,21 @@ describe('requestDownload', () => {
     expect(payload).toMatchObject({ sub: 'user-1', cid: 'QmCid', listingId: 'listing-1', type: 'download' })
     expect(Math.abs(payload.exp! * 1000 - expiresAt.getTime())).toBeLessThan(CLOCK_TOLERANCE_MS)
     expect(Math.abs(expiresAt.getTime() - Date.now() - ONE_HOUR_MS)).toBeLessThan(CLOCK_TOLERANCE_MS)
-
     expect(downloadCreate).toHaveBeenCalledWith({ data: { userId: 'user-1', listingId: 'listing-1' } })
     // Free listing: no purchase lookup needed.
     expect(purchaseFindFirst).not.toHaveBeenCalled()
   })
 
+  it('rejects a banned or deleted user with 403', async () => {
+    userFindUnique.mockResolvedValue({ ...activeUser, isBanned: true } as never)
+    listingFindFirst.mockResolvedValue(freeListing as never)
+
+    await expect(requestDownload('user-1', 'listing-1')).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+    expect(downloadCreate).not.toHaveBeenCalled()
+  })
+
   it('accepts a paid listing when the caller has a Confirmed purchase', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
     listingFindFirst.mockResolvedValue({ ...freeListing, isFree: false } as never)
     purchaseFindFirst.mockResolvedValue({ id: 'purchase-1' } as never)
     downloadCreate.mockResolvedValue({} as never)
@@ -77,6 +82,7 @@ describe('requestDownload', () => {
   })
 
   it('rejects with 403 LICENSE_NOT_FOUND for a paid listing without a Confirmed purchase', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
     listingFindFirst.mockResolvedValue({ ...freeListing, isFree: false } as never)
     purchaseFindFirst.mockResolvedValue(null)
 
@@ -87,9 +93,11 @@ describe('requestDownload', () => {
     expect(downloadCreate).not.toHaveBeenCalled()
   })
 
-  it('rejects with 410 MAX_DOWNLOADS_REACHED when the global cap is hit', async () => {
+  it('rejects with 410 when a NEW downloader would exceed the distinct-user cap', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
     listingFindFirst.mockResolvedValue({ ...freeListing, maxDownloads: 2 } as never)
-    downloadCount.mockResolvedValue(2)
+    downloadFindFirst.mockResolvedValue(null) // this user has not downloaded before
+    downloadFindMany.mockResolvedValue([{ userId: 'a' }, { userId: 'b' }] as never)
 
     await expect(requestDownload('user-1', 'listing-1')).rejects.toMatchObject({
       status: 410,
@@ -98,18 +106,31 @@ describe('requestDownload', () => {
     expect(downloadCreate).not.toHaveBeenCalled()
   })
 
-  it('allows the download while the cap is not reached', async () => {
+  it('lets an existing downloader re-request even when the cap is full', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
     listingFindFirst.mockResolvedValue({ ...freeListing, maxDownloads: 2 } as never)
-    downloadCount.mockResolvedValue(1)
+    downloadFindFirst.mockResolvedValue({ id: 'download-prev' } as never) // already downloaded
     downloadCreate.mockResolvedValue({} as never)
 
     const { downloadToken } = await requestDownload('user-1', 'listing-1')
 
-    expect(downloadCount).toHaveBeenCalledWith({ where: { listingId: 'listing-1' } })
+    expect(downloadFindMany).not.toHaveBeenCalled() // distinct-count skipped for existing downloaders
+    expect(jwt.verify(downloadToken, JWT_SECRET)).toMatchObject({ type: 'download' })
+  })
+
+  it('lets a new downloader through while the cap is not reached', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
+    listingFindFirst.mockResolvedValue({ ...freeListing, maxDownloads: 2 } as never)
+    downloadFindFirst.mockResolvedValue(null)
+    downloadFindMany.mockResolvedValue([{ userId: 'a' }] as never)
+    downloadCreate.mockResolvedValue({} as never)
+
+    const { downloadToken } = await requestDownload('user-1', 'listing-1')
     expect(jwt.verify(downloadToken, JWT_SECRET)).toMatchObject({ type: 'download' })
   })
 
   it('rejects with 404 when the listing has no attached file', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
     listingFindFirst.mockResolvedValue({ ...freeListing, fileIpfsCid: null } as never)
 
     await expect(requestDownload('user-1', 'listing-1')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
@@ -126,36 +147,52 @@ describe('resolveDownloadUrl', () => {
     )
   }
 
-  it('returns the IPFS gateway URL for a valid download token', () => {
-    expect(resolveDownloadUrl(signDownloadToken())).toBe('https://ipfs.io/ipfs/QmCid')
+  it('returns the IPFS gateway URL when the entitlement still holds', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
+    listingFindFirst.mockResolvedValue(freeListing as never)
+
+    await expect(resolveDownloadUrl(signDownloadToken())).resolves.toBe('https://ipfs.io/ipfs/QmCid')
   })
 
-  it('rejects a malformed token with 401', () => {
-    expect(() => resolveDownloadUrl('not-a-jwt')).toThrowError(
-      expect.objectContaining({ status: 401, code: 'AUTH_REQUIRED' }),
-    )
+  it('rejects a token whose listing was unpublished/deleted after issuance', async () => {
+    listingFindFirst.mockResolvedValue(null)
+    await expect(resolveDownloadUrl(signDownloadToken())).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
   })
 
-  it('rejects an expired token with 401', () => {
-    expect(() => resolveDownloadUrl(signDownloadToken({}, '-1s'))).toThrowError(
-      expect.objectContaining({ status: 401, code: 'AUTH_REQUIRED' }),
-    )
+  it('rejects a token whose owner was banned after issuance', async () => {
+    userFindUnique.mockResolvedValue({ ...activeUser, isBanned: true } as never)
+    listingFindFirst.mockResolvedValue(freeListing as never)
+    await expect(resolveDownloadUrl(signDownloadToken())).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
   })
 
-  it('rejects a valid JWT that is not a download token', () => {
+  it('rejects a paid-asset token once the purchase is no longer Confirmed', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
+    listingFindFirst.mockResolvedValue({ ...freeListing, isFree: false } as never)
+    purchaseFindFirst.mockResolvedValue(null)
+    await expect(resolveDownloadUrl(signDownloadToken())).rejects.toMatchObject({
+      status: 403,
+      code: 'LICENSE_NOT_FOUND',
+    })
+  })
+
+  it('rejects a malformed token with 401', async () => {
+    await expect(resolveDownloadUrl('not-a-jwt')).rejects.toMatchObject({ status: 401, code: 'AUTH_REQUIRED' })
+  })
+
+  it('rejects an expired token with 401', async () => {
+    await expect(resolveDownloadUrl(signDownloadToken({}, '-1s'))).rejects.toMatchObject({
+      status: 401,
+      code: 'AUTH_REQUIRED',
+    })
+  })
+
+  it('rejects a valid JWT that is not a download token', async () => {
     const accessLikeToken = jwt.sign({ sub: 'user-1' }, JWT_SECRET, { expiresIn: '1h' })
-    expect(() => resolveDownloadUrl(accessLikeToken)).toThrowError(
-      expect.objectContaining({ status: 401, code: 'AUTH_REQUIRED' }),
-    )
+    await expect(resolveDownloadUrl(accessLikeToken)).rejects.toMatchObject({ status: 401, code: 'AUTH_REQUIRED' })
   })
 })
 
 describe('listMyDownloads', () => {
-  beforeEach(() => {
-    downloadFindMany.mockReset()
-    downloadCount.mockReset()
-  })
-
   it('returns the caller downloads newest first with a listing summary and meta', async () => {
     const rows = [
       {
@@ -167,7 +204,7 @@ describe('listMyDownloads', () => {
       },
     ]
     downloadFindMany.mockResolvedValue(rows as never)
-    downloadCount.mockResolvedValue(1)
+    downloadCount.mockResolvedValue(1 as never)
 
     const { items, meta } = await listMyDownloads('user-1', { page: 1, limit: 20, skip: 0 })
 

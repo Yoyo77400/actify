@@ -11,31 +11,53 @@ const IPFS_GATEWAY_BASE_URL = 'https://ipfs.io/ipfs'
 
 const HISTORY_LISTING_SELECT = { id: true, slug: true, title: true, thumbnailCid: true } as const
 
-export async function requestDownload(userId: string, listingId: string) {
+// Throws unless `userId` is an active (non-banned) user entitled to download
+// `listing` right now: free asset, or a confirmed purchase. Shared by the
+// request and resolve paths so a token can't outlive the entitlement.
+async function assertEntitled(userId: string, listing: { id: string; isFree: boolean }) {
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user || user.deletedAt || user.isBanned) {
+    throw new AppError(403, 'FORBIDDEN', 'Compte non autorisé')
+  }
+  if (listing.isFree) {
+    return
+  }
+  const purchase = await prisma.purchase.findFirst({
+    where: { buyerId: userId, listingId: listing.id, status: PURCHASE_CONFIRMED },
+  })
+  if (!purchase) {
+    throw new AppError(403, 'LICENSE_NOT_FOUND', 'Aucune licence valide pour cet asset')
+  }
+}
+
+async function getDownloadableListingOrThrow(listingId: string) {
   const listing = await prisma.listing.findFirst({
     where: { id: listingId, status: PUBLISHED, deletedAt: null },
   })
   if (!listing) {
     throw new AppError(404, 'NOT_FOUND', 'Asset introuvable')
   }
+  return listing
+}
 
-  // Entitlement is checked off-chain for now: free listing, or a confirmed
-  // purchase by the caller. On-chain license verification comes with the NFT work.
-  if (!listing.isFree) {
-    const purchase = await prisma.purchase.findFirst({
-      where: { buyerId: userId, listingId: listing.id, status: PURCHASE_CONFIRMED },
-    })
-    if (!purchase) {
-      throw new AppError(403, 'LICENSE_NOT_FOUND', 'Aucune licence valide pour cet asset')
-    }
-  }
+export async function requestDownload(userId: string, listingId: string) {
+  const listing = await getDownloadableListingOrThrow(listingId)
+  await assertEntitled(userId, listing)
 
-  // maxDownloads is a global cap across all buyers (limited distribution),
-  // not a per-user quota.
+  // maxDownloads is a global cap on how many distinct buyers can download
+  // (limited distribution), NOT a per-token quota: a buyer who already has a
+  // download row re-requests freely, only new downloaders consume the cap.
   if (listing.maxDownloads != null) {
-    const totalDownloads = await prisma.download.count({ where: { listingId: listing.id } })
-    if (totalDownloads >= listing.maxDownloads) {
-      throw new AppError(410, 'MAX_DOWNLOADS_REACHED', 'Limite de téléchargements atteinte pour cet asset')
+    const alreadyDownloaded = await prisma.download.findFirst({ where: { userId, listingId: listing.id } })
+    if (!alreadyDownloaded) {
+      const distinctDownloaders = await prisma.download.findMany({
+        where: { listingId: listing.id },
+        distinct: ['userId'],
+        select: { userId: true },
+      })
+      if (distinctDownloaders.length >= listing.maxDownloads) {
+        throw new AppError(410, 'MAX_DOWNLOADS_REACHED', 'Limite de téléchargements atteinte pour cet asset')
+      }
     }
   }
 
@@ -55,9 +77,10 @@ export async function requestDownload(userId: string, listingId: string) {
   return { downloadToken, expiresAt: new Date(Date.now() + DOWNLOAD_TOKEN_TTL_MS) }
 }
 
-// The signed token is the sole proof of entitlement — no auth header on this
-// path. Anything not a valid, unexpired download token maps to the same 401.
-export function resolveDownloadUrl(token: string): string {
+// The signed token is the sole proof this request is authorized, but the
+// entitlement is re-checked against live state (ban, unpublish, refund) so a
+// token issued minutes ago can't outlive the right it represents.
+export async function resolveDownloadUrl(token: string): Promise<string> {
   let payload: jwt.JwtPayload
   try {
     payload = jwt.verify(token, process.env.JWT_SECRET!) as jwt.JwtPayload
@@ -65,9 +88,17 @@ export function resolveDownloadUrl(token: string): string {
     throw new AppError(401, 'AUTH_REQUIRED', 'Token de téléchargement invalide ou expiré')
   }
 
-  if (payload.type !== 'download' || typeof payload.cid !== 'string') {
+  if (
+    payload.type !== 'download'
+    || typeof payload.cid !== 'string'
+    || typeof payload.sub !== 'string'
+    || typeof payload.listingId !== 'string'
+  ) {
     throw new AppError(401, 'AUTH_REQUIRED', 'Token de téléchargement invalide ou expiré')
   }
+
+  const listing = await getDownloadableListingOrThrow(payload.listingId)
+  await assertEntitled(payload.sub, listing)
 
   return `${IPFS_GATEWAY_BASE_URL}/${payload.cid}`
 }
