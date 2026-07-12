@@ -1,12 +1,12 @@
 import { Router } from 'express'
 import { optionalAuth, requireAuth } from '../middlewares/auth.middleware'
-import { requireRole } from '../middlewares/role.middleware'
 import * as assetsController from '../controllers/assets.controller'
 import * as tokenizeController from '../controllers/tokenize.controller'
 
 export const assetsRouter = Router()
 
-assetsRouter.post('/', requireAuth, requireRole('creator'), assetsController.create)
+// Any authenticated user can publish their own assets — no creator role gate.
+assetsRouter.post('/', requireAuth, assetsController.create)
 assetsRouter.get('/', assetsController.list)
 assetsRouter.get('/:idOrSlug', optionalAuth, assetsController.getByIdOrSlug)
 assetsRouter.put('/:id', requireAuth, assetsController.update)

@@ -10,19 +10,8 @@
       </div>
     </header>
 
-    <!-- Role gate: the API rejects non-creators with 403, so hide the form. -->
-    <div v-if="!canCreate" class="surface p-8 flex flex-col items-center gap-3 text-center">
-      <Icon name="ph:seal-warning" class="text-3xl text-warning" />
-      <p class="text-foreground font-medium">Compte non habilité à publier</p>
-      <p class="text-muted text-sm max-w-md">
-        Devenez créateur pour publier un asset — demandez la promotion à un admin.
-      </p>
-      <NuxtLink to="/profile" class="ghost-btn mt-1">Retour au profil</NuxtLink>
-    </div>
-
-    <template v-else>
-      <!-- What "publish" actually does on-chain. -->
-      <div class="surface--soft p-4 flex items-start gap-3">
+    <!-- What "publish" actually does on-chain. -->
+    <div class="surface--soft p-4 flex items-start gap-3">
         <Icon name="ph:info" class="text-accent text-lg shrink-0 mt-0.5" />
         <p class="text-muted text-sm">
           Publier mint votre asset comme NFT <span class="text-foreground">XLS-20</span> sur le
@@ -264,7 +253,6 @@
           </div>
         </div>
       </section>
-    </template>
   </div>
 </template>
 
@@ -288,14 +276,8 @@ type Phase = 'form' | 'creating' | 'tokenize' | 'publishing' | 'publish-retry'
 // as opposed to 'active' which means work is actually running.
 type StepStatus = 'pending' | 'current' | 'active' | 'done' | 'error'
 
-const { user } = useAuth()
 const assets = useAssets()
 const { step: tokenizeStep, tokenize } = useTokenize()
-
-const canCreate = computed(() => {
-  const role = user.value?.role
-  return role === 'creator' || role === 'admin'
-})
 
 // Public data, SSR-fetched via the /api proxy. Empty on failure — non-blocking.
 const { data: categoriesData } = await useAsyncData('asset-new-categories', () => assets.categories())
