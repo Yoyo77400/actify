@@ -1,5 +1,5 @@
 import sdk from '@crossmarkio/sdk'
-import { WalletRejectedError, utf8ToHex, type WalletAdapter } from './types'
+import { WalletRejectedError, utf8ToHex, type MintNftParams, type WalletAdapter } from './types'
 
 export const crossmarkAdapter: WalletAdapter = {
   id: 'crossmark',
@@ -33,5 +33,24 @@ export const crossmarkAdapter: WalletAdapter = {
       throw new WalletRejectedError()
     }
     return signature
+  },
+
+  async mintNft(params: MintNftParams) {
+    // The backend re-derives the NFTokenID from the on-chain tx, so only the
+    // hash matters here; its nesting under resp varies across Crossmark docs.
+    const { response } = await sdk.async.signAndSubmitAndWait({
+      TransactionType: 'NFTokenMint',
+      Account: params.account,
+      NFTokenTaxon: params.nftokenTaxon,
+      URI: params.uriHex,
+      Flags: params.flags,
+      TransferFee: params.transferFee,
+    })
+    const resp = (response?.data as { resp?: { result?: { hash?: string }, hash?: string } } | undefined)?.resp
+    const txHash = resp?.result?.hash ?? resp?.hash
+    if (!txHash) {
+      throw new WalletRejectedError()
+    }
+    return { txHash }
   },
 }

@@ -1,89 +1,434 @@
-<script setup lang="ts">
-import { ref } from 'vue'
-
-const newItem = ref({
-  name: '',
-  description: '',
-  image: null as File | null,
-})
-
-const imagePreview = ref('')
-
-function handleFileUpload(event: Event) {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0] ?? null
-
-  if (!file) return
-
-  newItem.value.image = file
-  imagePreview.value = URL.createObjectURL(file)
-}
-
-async function submitForm() {
-  console.log('Submitting form with data:', newItem.value)
-  await navigateTo('/profile')
-}
-</script>
-
 <template>
-  <div class="p-4 max-w-2xl mx-auto">
-    <h1 class="text-2xl font-bold mb-4">Create New Asset</h1>
-
-    <form class="space-y-4" @submit.prevent="submitForm">
+  <div class="max-w-3xl mx-auto flex flex-col gap-7 py-2">
+    <header class="flex items-center gap-4">
+      <div class="w-12 h-12 rounded-xl bg-gradient-to-b from-[#2e6dff] to-[#1850db] flex items-center justify-center shrink-0">
+        <Icon name="ph:rocket-launch" class="text-xl text-white" />
+      </div>
       <div>
-        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
-          Name
-        </label>
-        <input
-          id="name"
-          v-model="newItem.name"
-          type="text"
-          required
-          class="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
+        <h1 class="ethnocentric text-foreground text-xl">Publier un asset</h1>
+        <p class="text-muted text-sm">Créez le brouillon, mintez le NFT, puis mettez-le en vente.</p>
+      </div>
+    </header>
+
+    <!-- Role gate: the API rejects non-creators with 403, so hide the form. -->
+    <div v-if="!canCreate" class="surface p-8 flex flex-col items-center gap-3 text-center">
+      <Icon name="ph:seal-warning" class="text-3xl text-warning" />
+      <p class="text-foreground font-medium">Compte non habilité à publier</p>
+      <p class="text-muted text-sm max-w-md">
+        Devenez créateur pour publier un asset — demandez la promotion à un admin.
+      </p>
+      <NuxtLink to="/profile" class="ghost-btn mt-1">Retour au profil</NuxtLink>
+    </div>
+
+    <template v-else>
+      <!-- What "publish" actually does on-chain. -->
+      <div class="surface--soft p-4 flex items-start gap-3">
+        <Icon name="ph:info" class="text-accent text-lg shrink-0 mt-0.5" />
+        <p class="text-muted text-sm">
+          Publier mint votre asset comme NFT <span class="text-foreground">XLS-20</span> sur le
+          <span class="text-foreground">XRP Ledger Testnet</span>. Gardez un peu de test-XRP dans votre
+          wallet pour couvrir les frais de mint.
+        </p>
       </div>
 
-      <div>
-        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">
-          Description
-        </label>
-        <textarea
-          id="description"
-          v-model="newItem.description"
-          rows="3"
-          required
-          class="w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-      </div>
+      <!-- ── Step 1: the form ── -->
+      <form v-if="phase === 'form'" class="flex flex-col gap-6" @submit.prevent="onSubmit">
+        <section class="surface p-6 flex flex-col gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label for="title" class="text-foreground text-sm font-medium">
+              Titre <span class="text-danger">*</span>
+            </label>
+            <input
+              id="title"
+              v-model.trim="form.title"
+              type="text"
+              required
+              minlength="3"
+              maxlength="200"
+              placeholder="ex : Pack de textures cyberpunk"
+              class="input"
+            >
+            <p class="text-muted text-xs">3 à 200 caractères.</p>
+          </div>
 
-      <div>
-        <label for="image" class="block text-sm font-medium text-gray-700 mb-1">
-          Image
-        </label>
-        <input
-          id="image"
-          type="file"
-          accept="image/*"
-          required
-          class="block w-full rounded-md border border-gray-300 p-2 text-sm text-gray-500 file:mr-4 file:rounded-md file:border file:border-gray-300 file:bg-gray-50 file:px-4 file:py-2 file:text-sm file:font-semibold hover:file:bg-gray-100"
-          @change="handleFileUpload"
-        >
-      </div>
+          <div class="flex flex-col gap-1.5">
+            <label for="shortDescription" class="text-foreground text-sm font-medium">Accroche</label>
+            <input
+              id="shortDescription"
+              v-model.trim="form.shortDescription"
+              type="text"
+              maxlength="200"
+              placeholder="Résumé court affiché sur la carte de l'asset"
+              class="input"
+            >
+          </div>
 
-      <div v-if="imagePreview" class="mt-2">
-        <img
-          :src="imagePreview"
-          alt="Preview"
-          class="h-40 w-auto rounded-md border object-cover"
-        >
-      </div>
+          <div class="flex flex-col gap-1.5">
+            <label for="description" class="text-foreground text-sm font-medium">Description</label>
+            <textarea
+              id="description"
+              v-model.trim="form.description"
+              rows="4"
+              placeholder="Décrivez le contenu, le format, la licence…"
+              class="input py-3 resize-none"
+              style="min-height: 96px"
+            />
+          </div>
 
-      <button
-        type="submit"
-        class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-      >
-        Create Asset
-      </button>
-    </form>
+          <div class="flex flex-col gap-2">
+            <span class="text-foreground text-sm font-medium">Catégories</span>
+            <div v-if="categoriesList.length" class="flex flex-wrap gap-2">
+              <button
+                v-for="cat in categoriesList"
+                :key="cat.id"
+                type="button"
+                class="chip text-sm"
+                :class="form.categoryIds.includes(cat.id) ? 'chip--active' : ''"
+                @click="toggleCategory(cat.id)"
+              >
+                {{ cat.name }}
+              </button>
+            </div>
+            <p v-else class="text-muted text-xs">Aucune catégorie disponible.</p>
+          </div>
+        </section>
+
+        <section class="surface p-6 flex flex-col gap-5">
+          <div class="flex flex-col gap-2">
+            <span class="text-foreground text-sm font-medium">Mode de distribution</span>
+            <div class="grid grid-cols-3 max-sm:grid-cols-1 gap-2">
+              <button
+                v-for="mode in DISTRIBUTION_MODES"
+                :key="mode.value"
+                type="button"
+                class="flex flex-col items-start gap-0.5 rounded-xl border px-4 py-3 text-left transition-colors"
+                :class="form.distributionMode === mode.value
+                  ? 'border-accent bg-panel-3 text-foreground'
+                  : 'border-line bg-transparent text-muted hover:border-line-strong'"
+                @click="form.distributionMode = mode.value"
+              >
+                <span class="text-sm font-medium">{{ mode.label }}</span>
+                <span class="text-xs text-muted">{{ mode.hint }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="form.distributionMode === 'limited'" class="flex flex-col gap-1.5">
+            <label for="maxDownloads" class="text-foreground text-sm font-medium">
+              Téléchargements maximum
+            </label>
+            <input
+              id="maxDownloads"
+              v-model.number="form.maxDownloads"
+              type="number"
+              min="1"
+              step="1"
+              placeholder="ex : 100"
+              class="input"
+            >
+          </div>
+
+          <label class="flex items-center gap-3 cursor-pointer select-none">
+            <input v-model="form.isFree" type="checkbox" class="w-4 h-4 accent-[#2363ff]">
+            <span class="text-foreground text-sm font-medium">Asset gratuit</span>
+          </label>
+
+          <div class="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
+            <div v-if="!form.isFree" class="flex flex-col gap-1.5">
+              <label for="basePrice" class="text-foreground text-sm font-medium">Prix</label>
+              <input
+                id="basePrice"
+                v-model.number="form.basePrice"
+                type="number"
+                min="0"
+                step="0.000001"
+                placeholder="ex : 12.5"
+                class="input"
+              >
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <span class="text-foreground text-sm font-medium">Devise</span>
+              <div class="input flex items-center gap-2 !bg-panel-3 cursor-not-allowed" aria-readonly="true">
+                <Icon name="ph:currency-circle-dollar" class="text-accent" />
+                <span class="text-foreground text-sm font-medium">XRP</span>
+                <span class="text-muted text-xs ml-auto">réglé en XRP uniquement</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label for="royalty" class="text-foreground text-sm font-medium">Royalties</label>
+            <div class="relative">
+              <input
+                id="royalty"
+                v-model.number="form.royaltyPercent"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="0"
+                class="input pr-10"
+              >
+              <span class="absolute right-4 top-1/2 -translate-y-1/2 text-muted text-sm">%</span>
+            </div>
+            <p class="text-muted text-xs">Part reversée à chaque revente (0 à 100 %).</p>
+          </div>
+        </section>
+
+        <section class="surface p-6 flex flex-col gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label for="tags" class="text-foreground text-sm font-medium">Tags</label>
+            <input
+              id="tags"
+              v-model.trim="form.tags"
+              type="text"
+              placeholder="cyberpunk, texture, 4k"
+              class="input"
+            >
+            <p class="text-muted text-xs">Séparés par des virgules.</p>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label for="fileIpfsCid" class="text-foreground text-sm font-medium">CID du fichier</label>
+            <input
+              id="fileIpfsCid"
+              v-model.trim="form.fileIpfsCid"
+              type="text"
+              placeholder="Qm… / bafy…"
+              class="input font-mono text-sm"
+            >
+            <p class="text-muted text-xs">CID IPFS du fichier.</p>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label for="thumbnailCid" class="text-foreground text-sm font-medium">
+              CID de la miniature <span class="text-muted font-normal">(optionnel)</span>
+            </label>
+            <input
+              id="thumbnailCid"
+              v-model.trim="form.thumbnailCid"
+              type="text"
+              placeholder="Qm… / bafy…"
+              class="input font-mono text-sm"
+            >
+          </div>
+        </section>
+
+        <p v-if="error" class="text-danger text-sm" role="alert">{{ error }}</p>
+
+        <div class="flex items-center justify-end gap-3">
+          <NuxtLink to="/profile" class="ghost-btn">Annuler</NuxtLink>
+          <button type="submit" class="primary-btn px-6">Créer et publier</button>
+        </div>
+      </form>
+
+      <!-- ── Steps 1→3: the pipeline ── -->
+      <section v-else class="surface p-6 flex flex-col gap-6">
+        <ol class="flex flex-col gap-4">
+          <li v-for="s in steps" :key="s.key" class="flex items-center gap-3">
+            <span class="shrink-0 w-6 h-6 flex items-center justify-center">
+              <Icon v-if="s.status === 'done'" name="ph:check-circle-fill" class="text-success text-xl" />
+              <Icon v-else-if="s.status === 'error'" name="ph:warning-circle-fill" class="text-danger text-xl" />
+              <span
+                v-else-if="s.status === 'active'"
+                class="w-4 h-4 rounded-full border-2 border-accent border-t-transparent animate-spin"
+              />
+              <Icon v-else-if="s.status === 'current'" name="ph:dot-outline-fill" class="text-accent text-2xl" />
+              <Icon v-else name="ph:circle" class="text-muted-2 text-xl" />
+            </span>
+            <span
+              class="text-sm"
+              :class="s.status === 'pending' ? 'text-muted' : 'text-foreground font-medium'"
+            >
+              {{ s.label }}
+            </span>
+          </li>
+        </ol>
+
+        <!-- Step 2 wallet selection: user picks the signer for the mint. -->
+        <div v-if="phase === 'tokenize'" class="flex flex-col gap-3">
+          <p class="text-muted text-sm">
+            Choisissez le wallet qui signera le mint XRPL de cet asset.
+          </p>
+          <AuthWalletPicker :pending="pendingWallet" :step="tokenizeStep" @select="onWalletSelect" />
+          <p v-if="error" class="text-danger text-sm" role="alert">{{ error }}</p>
+        </div>
+
+        <!-- Step 3 recovery: the draft + NFT exist, only the publish call failed. -->
+        <div v-else-if="phase === 'publish-retry'" class="flex flex-col gap-3">
+          <p v-if="error" class="text-danger text-sm" role="alert">{{ error }}</p>
+          <div class="flex items-center gap-3">
+            <button type="button" class="primary-btn px-6" @click="runPublish">Réessayer la publication</button>
+            <NuxtLink to="/profile" class="ghost-btn">Plus tard</NuxtLink>
+          </div>
+        </div>
+      </section>
+    </template>
   </div>
 </template>
+
+<script setup lang="ts">
+import type { AssetCard, CategoryWithCount, CreateAssetBody } from '~/types/asset'
+import type { WalletId } from '~/lib/wallets'
+
+definePageMeta({ middleware: 'auth' })
+
+useHead({ title: 'Publier un asset' })
+
+const DISTRIBUTION_MODES = [
+  { value: 'unlimited', label: 'Illimité', hint: 'Ventes illimitées' },
+  { value: 'limited', label: 'Limité', hint: 'Nombre de ventes plafonné' },
+  { value: 'unique', label: 'Unique', hint: 'Un seul acquéreur' },
+] as const
+
+type DistributionMode = (typeof DISTRIBUTION_MODES)[number]['value']
+type Phase = 'form' | 'creating' | 'tokenize' | 'publishing' | 'publish-retry'
+// 'current' = the pipeline is paused here waiting for a user action (wallet pick),
+// as opposed to 'active' which means work is actually running.
+type StepStatus = 'pending' | 'current' | 'active' | 'done' | 'error'
+
+const { user } = useAuth()
+const assets = useAssets()
+const { step: tokenizeStep, tokenize } = useTokenize()
+
+const canCreate = computed(() => {
+  const role = user.value?.role
+  return role === 'creator' || role === 'admin'
+})
+
+// Public data, SSR-fetched via the /api proxy. Empty on failure — non-blocking.
+const { data: categoriesData } = await useAsyncData('asset-new-categories', () => assets.categories())
+const categoriesList = computed<CategoryWithCount[]>(() => categoriesData.value ?? [])
+
+const form = reactive({
+  title: '',
+  shortDescription: '',
+  description: '',
+  categoryIds: [] as number[],
+  distributionMode: 'unlimited' as DistributionMode,
+  maxDownloads: null as number | null,
+  isFree: false,
+  basePrice: null as number | null,
+  royaltyPercent: 0 as number,
+  tags: '',
+  fileIpfsCid: '',
+  thumbnailCid: '',
+})
+
+const phase = ref<Phase>('form')
+const created = ref<AssetCard | null>(null)
+const tokenized = ref(false)
+const pendingWallet = ref<WalletId | null>(null)
+const error = ref<string | null>(null)
+
+function toggleCategory(id: number) {
+  const i = form.categoryIds.indexOf(id)
+  if (i === -1) form.categoryIds.push(id)
+  else form.categoryIds.splice(i, 1)
+}
+
+// v-model.number leaves an empty field as '' at runtime; coerce anything
+// non-finite back to null so the API gets clean numbers.
+function numOrNull(v: number | null): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
+
+function clampPercent(v: number | null): number {
+  const n = numOrNull(v) ?? 0
+  return Math.min(100, Math.max(0, n))
+}
+
+function buildBody(): CreateAssetBody {
+  const tags = form.tags.split(',').map(t => t.trim()).filter(t => t.length > 0)
+  return {
+    title: form.title.trim(),
+    shortDescription: form.shortDescription.trim() || null,
+    description: form.description.trim() || null,
+    categoryIds: form.categoryIds,
+    distributionMode: form.distributionMode,
+    maxDownloads: form.distributionMode === 'limited' ? numOrNull(form.maxDownloads) : null,
+    isFree: form.isFree,
+    basePrice: form.isFree ? null : numOrNull(form.basePrice),
+    currency: 'XRP',
+    // % → basis points: 12.5 % → 1250 bps (API contract, 0–10000).
+    royaltyBps: Math.round(clampPercent(form.royaltyPercent) * 100),
+    tags,
+    fileIpfsCid: form.fileIpfsCid.trim() || null,
+    thumbnailCid: form.thumbnailCid.trim() || null,
+  }
+}
+
+const steps = computed<{ key: string; label: string; status: StepStatus }[]>(() => [
+  {
+    key: 'create',
+    label: 'Création du brouillon',
+    status: created.value ? 'done' : phase.value === 'creating' ? 'active' : 'pending',
+  },
+  {
+    key: 'tokenize',
+    label: 'Tokenisation on-chain (mint XRPL)',
+    status: tokenized.value
+      ? 'done'
+      : pendingWallet.value
+        ? 'active'
+        : phase.value === 'tokenize'
+          ? 'current'
+          : 'pending',
+  },
+  {
+    key: 'publish',
+    label: 'Publication',
+    status: phase.value === 'publishing'
+      ? 'active'
+      : phase.value === 'publish-retry'
+        ? 'error'
+        : 'pending',
+  },
+])
+
+// Step 1 — create the Draft asset.
+async function onSubmit() {
+  error.value = null
+  phase.value = 'creating'
+  try {
+    created.value = await assets.create(buildBody())
+    phase.value = 'tokenize'
+  } catch (err) {
+    error.value = toApiError(err)?.message ?? 'Impossible de créer le brouillon, réessayez.'
+    phase.value = 'form'
+  }
+}
+
+// Step 2 — mint the NFT with the chosen wallet, then chain into publish.
+async function onWalletSelect(id: WalletId) {
+  if (!created.value) return
+  error.value = null
+  pendingWallet.value = id
+  try {
+    await tokenize(created.value.id, id)
+    tokenized.value = true
+    await runPublish()
+  } catch (err) {
+    // The draft still exists on the API; the user can pick a wallet and retry.
+    error.value = toApiError(err)?.message
+      ?? 'La tokenisation a échoué. Votre brouillon est conservé — vous pouvez relancer le mint.'
+  } finally {
+    pendingWallet.value = null
+  }
+}
+
+// Step 3 — publish. Reachable both from the happy path and the retry button.
+async function runPublish() {
+  if (!created.value) return
+  error.value = null
+  phase.value = 'publishing'
+  try {
+    const published = await assets.publish(created.value.id)
+    await navigateTo(`/assets/${published.slug ?? published.id}`)
+  } catch (err) {
+    error.value = toApiError(err)?.message ?? 'La publication a échoué, réessayez.'
+    phase.value = 'publish-retry'
+  }
+}
+</script>

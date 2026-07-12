@@ -21,7 +21,7 @@ export function isNetworkError(err: unknown): boolean {
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
-  body?: Record<string, unknown>
+  body?: unknown
   /** false = never send the Authorization header (anonymous-by-intent calls, e.g. wallet login). */
   auth?: boolean
 }
@@ -46,7 +46,8 @@ export function useApi() {
     const res = await $fetch<ApiEnvelope<T>>(path, {
       baseURL: config.public.apiBase,
       method: opts.method ?? 'GET',
-      body: opts.body,
+      // Callers pass typed DTOs; ofetch serializes any plain object to JSON.
+      body: opts.body as Record<string, unknown> | undefined,
       headers: sendAuth ? { Authorization: `Bearer ${store.accessToken}` } : {},
       timeout: REQUEST_TIMEOUT_MS,
     })
@@ -104,9 +105,9 @@ export function useApi() {
 
   return {
     get: <T>(path: string, opts?: Pick<RequestOptions, 'auth'>) => request<T>(path, opts),
-    post: <T>(path: string, body?: Record<string, unknown>, opts?: Pick<RequestOptions, 'auth'>) =>
+    post: <T>(path: string, body?: unknown, opts?: Pick<RequestOptions, 'auth'>) =>
       request<T>(path, { ...opts, method: 'POST', body }),
-    put: <T>(path: string, body?: Record<string, unknown>) => request<T>(path, { method: 'PUT', body }),
+    put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
     del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
     refreshSession,
   }

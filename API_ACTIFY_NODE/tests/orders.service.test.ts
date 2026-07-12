@@ -97,6 +97,9 @@ describe('createOrder', () => {
     })
     expect(order.paymentTag).toBeTypeOf('number')
     expect(order.paymentTag).toBeGreaterThanOrEqual(0)
+    // Must fit a Postgres INT4 (the payment_tag column), not just a uint32.
+    expect(order.paymentTag).toBeLessThanOrEqual(2 ** 31 - 1)
+    expect(Number.isInteger(order.paymentTag)).toBe(true)
     expect(order.expiresAt).toEqual(new Date('2026-01-01T00:30:00Z'))
     const createArgs = purchaseCreate.mock.calls[0][0] as { data: Record<string, unknown> }
     expect(createArgs.data.txHash).toMatch(/^pending:[0-9a-f-]{36}$/)

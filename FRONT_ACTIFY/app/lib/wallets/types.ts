@@ -5,6 +5,17 @@ export interface WalletConnection {
   publicKey: string
 }
 
+// Parameters for an XLS-20 NFTokenMint, produced by the backend tokenize
+// intent. The backend re-derives the NFTokenID from the validated tx, so the
+// adapter only needs to return the transaction hash.
+export interface MintNftParams {
+  account: string
+  uriHex: string
+  nftokenTaxon: number
+  flags: number
+  transferFee: number
+}
+
 export interface WalletAdapter {
   id: WalletId
   label: string
@@ -20,6 +31,17 @@ export interface WalletAdapter {
    * against `hex(utf8(message))`.
    */
   signMessage(message: string): Promise<string>
+  /** Signs + submits an NFTokenMint; returns the resulting tx hash. */
+  mintNft(params: MintNftParams): Promise<{ txHash: string }>
+}
+
+// tfTransferable = 8: the marketplace/royalty flag Actify always mints with.
+export function flagsToGemwallet(flags: number): { tfTransferable?: boolean; tfBurnable?: boolean; tfOnlyXRP?: boolean } {
+  return {
+    tfTransferable: (flags & 8) !== 0,
+    tfBurnable: (flags & 1) !== 0,
+    tfOnlyXRP: (flags & 2) !== 0,
+  }
 }
 
 export class WalletRejectedError extends Error {

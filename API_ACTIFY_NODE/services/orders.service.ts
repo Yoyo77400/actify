@@ -25,8 +25,10 @@ const PRISMA_UNIQUE_VIOLATION = 'P2002'
 // before storing — otherwise 'abc…' and 'ABC…' would be distinct strings and
 // bypass the unique-txHash reuse guard.
 const TX_HASH_PATTERN = /^[0-9A-Fa-f]{64}$/
-// XRPL DestinationTag is an unsigned 32-bit integer.
-const MAX_DESTINATION_TAG = 2 ** 32
+// XRPL DestinationTag is an unsigned 32-bit integer, but the payment_tag
+// column is a Postgres INT4 (signed, max 2^31-1). Draw from the lower half so
+// the value is both a valid DestinationTag and storable — 2^31 tags is ample.
+const MAX_DESTINATION_TAG = 2 ** 31
 
 const LISTING_SUMMARY_INCLUDE = {
   listing: {

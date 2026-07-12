@@ -1,5 +1,5 @@
-import { getPublicKey, isInstalled, signMessage } from '@gemwallet/api'
-import { WalletRejectedError, type WalletAdapter } from './types'
+import { getPublicKey, isInstalled, mintNFT, signMessage } from '@gemwallet/api'
+import { flagsToGemwallet, WalletRejectedError, type MintNftParams, type WalletAdapter } from './types'
 
 export const gemwalletAdapter: WalletAdapter = {
   id: 'gemwallet',
@@ -30,5 +30,18 @@ export const gemwalletAdapter: WalletAdapter = {
       throw new WalletRejectedError()
     }
     return res.result.signedMessage
+  },
+
+  async mintNft(params: MintNftParams) {
+    const res = await mintNFT({
+      NFTokenTaxon: params.nftokenTaxon,
+      URI: params.uriHex,
+      flags: flagsToGemwallet(params.flags),
+      transferFee: params.transferFee,
+    })
+    if (res.type !== 'response' || !res.result?.hash) {
+      throw new WalletRejectedError()
+    }
+    return { txHash: res.result.hash }
   },
 }
