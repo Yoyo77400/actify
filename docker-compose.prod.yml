@@ -35,6 +35,10 @@ services:
       XRPL_RPC_URL: ${XRPL_RPC_URL:-https://s.altnet.rippletest.net:51234/}
       # Wallet auto-promoted to admin on login (empty = disabled).
       ADMIN_WALLET_ADDRESS: ${ADMIN_WALLET_ADDRESS:-}
+      # Where uploaded asset files are stored (persisted via the volume below).
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      - actify_uploads:/app/uploads
     networks:
       - actify-prod
     depends_on:
@@ -88,6 +92,7 @@ services:
 
 volumes:
   postgres_data:
+  actify_uploads:
 
 networks:
   actify-prod:

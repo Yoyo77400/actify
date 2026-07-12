@@ -9,6 +9,7 @@ import { reviewsRouter, assetReviewsRouter } from './reviews.routes'
 import { assetFavoritesRouter, meFavoritesRouter } from './favorites.routes'
 import { ordersRouter } from './orders.routes'
 import { downloadsRouter } from './downloads.routes'
+import { filesRouter } from './files.routes'
 import { searchRouter } from './search.routes'
 import { statsRouter } from './stats.routes'
 import { creatorRouter } from './creator.routes'
@@ -43,6 +44,7 @@ v1Router.use('/categories', categoriesRouter)
 v1Router.use('/reviews', reviewsRouter)
 v1Router.use('/orders', ordersRouter)
 v1Router.use('/downloads', downloadsRouter)
+v1Router.use('/files', filesRouter)
 v1Router.use('/search', searchRouter)
 v1Router.use('/stats', statsRouter)
 v1Router.use('/creator', creatorRouter)
