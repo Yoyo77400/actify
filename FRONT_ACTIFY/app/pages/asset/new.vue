@@ -10,19 +10,8 @@
       </div>
     </header>
 
-    <!-- Role gate: the API rejects non-creators with 403, so hide the form. -->
-    <div v-if="!canCreate" class="surface p-8 flex flex-col items-center gap-3 text-center">
-      <Icon name="ph:seal-warning" class="text-3xl text-warning" />
-      <p class="text-foreground font-medium">Compte non habilité à publier</p>
-      <p class="text-muted text-sm max-w-md">
-        Devenez créateur pour publier un asset — demandez la promotion à un admin.
-      </p>
-      <NuxtLink to="/profile" class="ghost-btn mt-1">Retour au profil</NuxtLink>
-    </div>
-
-    <template v-else>
-      <!-- What "publish" actually does on-chain. -->
-      <div class="surface--soft p-4 flex items-start gap-3">
+    <!-- What "publish" actually does on-chain. -->
+    <div class="surface--soft p-4 flex items-start gap-3">
         <Icon name="ph:info" class="text-accent text-lg shrink-0 mt-0.5" />
         <p class="text-muted text-sm">
           Publier mint votre asset comme NFT <span class="text-foreground">XLS-20</span> sur le
@@ -190,28 +179,32 @@
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="fileIpfsCid" class="text-foreground text-sm font-medium">CID du fichier</label>
+            <label for="file" class="text-foreground text-sm font-medium">
+              Fichier de l'asset <span class="text-danger">*</span>
+            </label>
             <input
-              id="fileIpfsCid"
-              v-model.trim="form.fileIpfsCid"
-              type="text"
-              placeholder="Qm… / bafy…"
-              class="input font-mono text-sm"
+              id="file"
+              type="file"
+              class="input file:mr-3 file:rounded-md file:border-0 file:bg-panel-3 file:px-3 file:py-1.5 file:text-foreground"
+              @change="onFilePick"
             >
-            <p class="text-muted text-xs">CID IPFS du fichier.</p>
+            <p class="text-muted text-xs">
+              {{ fileName ? `Sélectionné : ${fileName}` : 'Le fichier que l\'acheteur téléchargera (50 Mo max).' }}
+            </p>
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="thumbnailCid" class="text-foreground text-sm font-medium">
-              CID de la miniature <span class="text-muted font-normal">(optionnel)</span>
+            <label for="thumbnail" class="text-foreground text-sm font-medium">
+              Miniature <span class="text-muted font-normal">(image, optionnel)</span>
             </label>
             <input
-              id="thumbnailCid"
-              v-model.trim="form.thumbnailCid"
-              type="text"
-              placeholder="Qm… / bafy…"
-              class="input font-mono text-sm"
+              id="thumbnail"
+              type="file"
+              accept="image/*"
+              class="input file:mr-3 file:rounded-md file:border-0 file:bg-panel-3 file:px-3 file:py-1.5 file:text-foreground"
+              @change="onThumbnailPick"
             >
+            <p v-if="thumbnailName" class="text-muted text-xs">Sélectionné : {{ thumbnailName }}</p>
           </div>
         </section>
 
@@ -264,7 +257,6 @@
           </div>
         </div>
       </section>
-    </template>
   </div>
 </template>
 
@@ -288,14 +280,8 @@ type Phase = 'form' | 'creating' | 'tokenize' | 'publishing' | 'publish-retry'
 // as opposed to 'active' which means work is actually running.
 type StepStatus = 'pending' | 'current' | 'active' | 'done' | 'error'
 
-const { user } = useAuth()
 const assets = useAssets()
 const { step: tokenizeStep, tokenize } = useTokenize()
-
-const canCreate = computed(() => {
-  const role = user.value?.role
-  return role === 'creator' || role === 'admin'
-})
 
 // Public data, SSR-fetched via the /api proxy. Empty on failure — non-blocking.
 const { data: categoriesData } = await useAsyncData('asset-new-categories', () => assets.categories())
@@ -312,9 +298,20 @@ const form = reactive({
   basePrice: null as number | null,
   royaltyPercent: 0 as number,
   tags: '',
-  fileIpfsCid: '',
-  thumbnailCid: '',
 })
+
+// Uploaded files (kept out of the reactive form — File objects aren't JSON).
+const file = ref<File | null>(null)
+const thumbnail = ref<File | null>(null)
+const fileName = computed(() => file.value?.name ?? '')
+const thumbnailName = computed(() => thumbnail.value?.name ?? '')
+
+function onFilePick(e: Event) {
+  file.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+function onThumbnailPick(e: Event) {
+  thumbnail.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
 
 const phase = ref<Phase>('form')
 const created = ref<AssetCard | null>(null)
@@ -354,15 +351,13 @@ function buildBody(): CreateAssetBody {
     // % → basis points: 12.5 % → 1250 bps (API contract, 0–10000).
     royaltyBps: Math.round(clampPercent(form.royaltyPercent) * 100),
     tags,
-    fileIpfsCid: form.fileIpfsCid.trim() || null,
-    thumbnailCid: form.thumbnailCid.trim() || null,
   }
 }
 
 const steps = computed<{ key: string; label: string; status: StepStatus }[]>(() => [
   {
     key: 'create',
-    label: 'Création du brouillon',
+    label: 'Création + upload du fichier',
     status: created.value ? 'done' : phase.value === 'creating' ? 'active' : 'pending',
   },
   {
@@ -387,12 +382,21 @@ const steps = computed<{ key: string; label: string; status: StepStatus }[]>(() 
   },
 ])
 
-// Step 1 — create the Draft asset.
+// Step 1 — create the Draft asset and upload its file(s).
 async function onSubmit() {
   error.value = null
+  if (!file.value) {
+    error.value = 'Ajoutez le fichier de l\'asset avant de publier.'
+    return
+  }
   phase.value = 'creating'
   try {
-    created.value = await assets.create(buildBody())
+    const draft = await assets.create(buildBody())
+    await assets.uploadFile(draft.id, file.value)
+    if (thumbnail.value) {
+      await assets.uploadThumbnail(draft.id, thumbnail.value)
+    }
+    created.value = draft
     phase.value = 'tokenize'
   } catch (err) {
     error.value = toApiError(err)?.message ?? 'Impossible de créer le brouillon, réessayez.'

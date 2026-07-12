@@ -50,11 +50,7 @@ import type { AssetCard } from '~/types/asset'
 
 const props = defineProps<{ asset: AssetCard }>()
 
-const thumbnailUrl = computed(() =>
-  props.asset.thumbnailCid
-    ? `https://ipfs.io/ipfs/${props.asset.thumbnailCid}`
-    : `https://picsum.photos/seed/${props.asset.id}/600/400`,
-)
+const thumbnailUrl = computed(() => assetImage(props.asset.thumbnailCid, props.asset.id))
 
 const sellerName = computed(() => {
   const { displayName, username, id } = props.asset.seller

@@ -11,7 +11,7 @@ vi.mock('../services/prisma', () => ({
 }))
 
 import { prisma } from '../services/prisma'
-import { listMyDownloads, requestDownload, resolveDownloadUrl } from '../services/downloads.service'
+import { listMyDownloads, requestDownload, resolveDownloadFile } from '../services/downloads.service'
 
 const userFindUnique = vi.mocked(prisma.user.findUnique)
 const listingFindFirst = vi.mocked(prisma.listing.findFirst)
@@ -138,49 +138,52 @@ describe('requestDownload', () => {
   })
 })
 
-describe('resolveDownloadUrl', () => {
+describe('resolveDownloadFile', () => {
   function signDownloadToken(overrides: Record<string, unknown> = {}, expiresIn = '1h') {
     return jwt.sign(
-      { sub: 'user-1', cid: 'QmCid', listingId: 'listing-1', type: 'download', ...overrides },
+      { sub: 'user-1', cid: 'stored-key.zip', listingId: 'listing-1', type: 'download', ...overrides },
       JWT_SECRET,
       { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] },
     )
   }
 
-  it('returns the IPFS gateway URL when the entitlement still holds', async () => {
+  it('returns the stored file key + a friendly name when the entitlement still holds', async () => {
     userFindUnique.mockResolvedValue(activeUser as never)
-    listingFindFirst.mockResolvedValue(freeListing as never)
+    listingFindFirst.mockResolvedValue({ ...freeListing, slug: 'my-asset' } as never)
 
-    await expect(resolveDownloadUrl(signDownloadToken())).resolves.toBe('https://ipfs.io/ipfs/QmCid')
+    await expect(resolveDownloadFile(signDownloadToken())).resolves.toEqual({
+      key: 'stored-key.zip',
+      downloadName: 'my-asset.zip',
+    })
   })
 
   it('rejects a token whose listing was unpublished/deleted after issuance', async () => {
     listingFindFirst.mockResolvedValue(null)
-    await expect(resolveDownloadUrl(signDownloadToken())).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
+    await expect(resolveDownloadFile(signDownloadToken())).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
   })
 
   it('rejects a token whose owner was banned after issuance', async () => {
     userFindUnique.mockResolvedValue({ ...activeUser, isBanned: true } as never)
     listingFindFirst.mockResolvedValue(freeListing as never)
-    await expect(resolveDownloadUrl(signDownloadToken())).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+    await expect(resolveDownloadFile(signDownloadToken())).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
   })
 
   it('rejects a paid-asset token once the purchase is no longer Confirmed', async () => {
     userFindUnique.mockResolvedValue(activeUser as never)
     listingFindFirst.mockResolvedValue({ ...freeListing, isFree: false } as never)
     purchaseFindFirst.mockResolvedValue(null)
-    await expect(resolveDownloadUrl(signDownloadToken())).rejects.toMatchObject({
+    await expect(resolveDownloadFile(signDownloadToken())).rejects.toMatchObject({
       status: 403,
       code: 'LICENSE_NOT_FOUND',
     })
   })
 
   it('rejects a malformed token with 401', async () => {
-    await expect(resolveDownloadUrl('not-a-jwt')).rejects.toMatchObject({ status: 401, code: 'AUTH_REQUIRED' })
+    await expect(resolveDownloadFile('not-a-jwt')).rejects.toMatchObject({ status: 401, code: 'AUTH_REQUIRED' })
   })
 
   it('rejects an expired token with 401', async () => {
-    await expect(resolveDownloadUrl(signDownloadToken({}, '-1s'))).rejects.toMatchObject({
+    await expect(resolveDownloadFile(signDownloadToken({}, '-1s'))).rejects.toMatchObject({
       status: 401,
       code: 'AUTH_REQUIRED',
     })
@@ -188,7 +191,7 @@ describe('resolveDownloadUrl', () => {
 
   it('rejects a valid JWT that is not a download token', async () => {
     const accessLikeToken = jwt.sign({ sub: 'user-1' }, JWT_SECRET, { expiresIn: '1h' })
-    await expect(resolveDownloadUrl(accessLikeToken)).rejects.toMatchObject({ status: 401, code: 'AUTH_REQUIRED' })
+    await expect(resolveDownloadFile(accessLikeToken)).rejects.toMatchObject({ status: 401, code: 'AUTH_REQUIRED' })
   })
 })
 
