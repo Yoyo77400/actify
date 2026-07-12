@@ -1,4 +1,4 @@
-export type WalletId = 'gemwallet' | 'crossmark' | 'devwallet'
+export type WalletId = 'gemwallet' | 'crossmark'
 
 export interface WalletConnection {
   address: string
