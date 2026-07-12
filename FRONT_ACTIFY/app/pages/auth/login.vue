@@ -19,7 +19,7 @@
         <p class="text-muted text-xs tracking-widest uppercase mt-1">Secure Gateway</p>
       </div>
 
-      <AuthWalletPicker :pending="pending" @select="loginWithWallet" />
+      <AuthWalletPicker :pending="pending" :step="step" @select="loginWithWallet" />
 
       <p v-if="error" class="text-red-400 text-xs text-center" role="alert">{{ error }}</p>
 
@@ -42,10 +42,13 @@
       </p>
     </div>
 
-    <p class="text-muted text-xs mt-6 relative z-10">
-      Nouveau sur Actify ?
-      <span class="text-accent cursor-pointer hover:underline">Demander une invitation</span>
-    </p>
+    <NuxtLink
+      to="/"
+      class="mt-6 relative z-10 flex items-center gap-1.5 text-muted text-xs hover:text-foreground transition-colors"
+    >
+      <Icon name="ph:arrow-left" class="text-sm" />
+      Explorer le marketplace sans se connecter
+    </NuxtLink>
 
     <footer class="absolute bottom-4 w-full px-6 flex items-center justify-between text-muted text-xs">
       <div class="flex gap-3.5 flex-wrap">
@@ -64,7 +67,7 @@ definePageMeta({ layout: 'auth' })
 useHead({ title: 'Connexion' })
 
 const { isLoggedIn } = useAuth()
-const { pending, error, loginWithWallet } = useWalletAuth()
+const { pending, step, error, loginWithWallet } = useWalletAuth()
 
 if (isLoggedIn.value) {
   await navigateTo('/profile')

@@ -21,16 +21,21 @@ services:
       - "8080:8080"
     environment:
       NODE_ENV: development
-      # The API runs on the HOST (not containerised in dev). From inside the
-      # container, localhost is the container itself, so reach the host via
+      # The browser calls /api on the front's own origin (localhost:8080);
+      # Nitro (in this container) proxies that to the API on the HOST. Inside
+      # the container, localhost is the container, so target the host via
       # host.docker.internal (mapped below for Linux; automatic on Docker
-      # Desktop). Overrides runtimeConfig.public.apiBase.
-      NUXT_PUBLIC_API_BASE: http://host.docker.internal:3000/api/v1
+      # Desktop). This is the proxy target, NOT what the browser sees.
+      NUXT_DEV_API_ORIGIN: http://host.docker.internal:3000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./FRONT_ACTIFY:/app
       - frontend_node_modules:/app/node_modules
+      # Isolate the Nuxt build dir from the host bind mount: a host-side
+      # `nuxt prepare`/`typecheck` (or the IDE) must not clobber the container's
+      # dev build. Rebuilt on every start, so no staleness concern.
+      - /app/.nuxt
     depends_on:
       db:
         condition: service_healthy

@@ -1,10 +1,22 @@
 import { FetchError } from 'ofetch'
 import type { ApiError } from '~/types/auth'
 
+// Abort a request that hangs (unreachable API, dead proxy) instead of spinning
+// forever — the caller turns the resulting error into a clear message.
+const REQUEST_TIMEOUT_MS = 15_000
+
 interface ApiEnvelope<T> {
   success: boolean
   data: T
   meta?: { page: number; limit: number; total: number; totalPages: number }
+}
+
+/**
+ * True for a request that never got an HTTP response (DNS/connection failure,
+ * timeout abort) — as opposed to a response with an error status.
+ */
+export function isNetworkError(err: unknown): boolean {
+  return err instanceof FetchError && err.statusCode == null
 }
 
 interface RequestOptions {
@@ -36,6 +48,7 @@ export function useApi() {
       method: opts.method ?? 'GET',
       body: opts.body,
       headers: sendAuth ? { Authorization: `Bearer ${store.accessToken}` } : {},
+      timeout: REQUEST_TIMEOUT_MS,
     })
     return res.data
   }
@@ -47,6 +60,7 @@ export function useApi() {
       baseURL: config.public.apiBase,
       method: 'POST',
       body: { refreshToken: store.refreshToken },
+      timeout: REQUEST_TIMEOUT_MS,
     })
       .then((res) => {
         store.setTokens(res.data)

@@ -14,13 +14,16 @@ export default defineNuxtConfig({
       '/api/**': { proxy: 'http://api:3000/api/**' },
     },
   },
-  // Dev: same-origin proxy to the local API — the front runs with zero .env
-  // and no CORS. NUXT_PUBLIC_API_BASE can still override apiBase if needed.
+  // Dev: same-origin proxy to the API. The BROWSER always calls /api on its
+  // own origin (localhost:3001 for `npm run dev`, localhost:8080 for Docker),
+  // and Nitro forwards to the real API — so it works even when the front runs
+  // in a container and the API on the host (host.docker.internal). The target
+  // is env-configurable; default 127.0.0.1 for a plain host `npm run dev`.
+  // 127.0.0.1, not localhost: the API binds IPv4 only, and localhost can
+  // resolve to ::1 first — where an unrelated dev server may be listening.
   $development: {
     routeRules: {
-      // 127.0.0.1, not localhost: the API binds IPv4 only, and localhost can
-      // resolve to ::1 first — where an unrelated dev server may be listening.
-      '/api/**': { proxy: 'http://127.0.0.1:3000/api/**' },
+      '/api/**': { proxy: `${process.env.NUXT_DEV_API_ORIGIN || 'http://127.0.0.1:3000'}/api/**` },
     },
   },
   runtimeConfig: {

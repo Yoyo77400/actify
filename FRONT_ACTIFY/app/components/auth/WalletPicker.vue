@@ -8,7 +8,7 @@
       >
         <Icon :name="wallet.icon" class="text-xl shrink-0" />
         <span class="font-medium text-sm">
-          {{ pending === wallet.id ? 'Signature en cours...' : wallet.label }}
+          {{ pending === wallet.id ? (step ?? 'Connexion…') : wallet.label }}
         </span>
         <span
           v-if="pending === wallet.id"
@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { getWalletAdapter, walletDescriptors, type WalletId } from '~/lib/wallets'
 
-defineProps<{ pending: WalletId | null }>()
+defineProps<{ pending: WalletId | null; step?: string | null }>()
 
 defineEmits<{ select: [id: WalletId] }>()
 

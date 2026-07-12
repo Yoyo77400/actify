@@ -54,7 +54,7 @@
       </div>
 
       <template v-if="showPicker">
-        <AuthWalletPicker :pending="pending" @select="onSelect" />
+        <AuthWalletPicker :pending="pending" :step="step" @select="onSelect" />
         <p v-if="error" class="text-red-400 text-xs" role="alert">{{ error }}</p>
         <button class="text-muted text-xs hover:text-foreground hover:underline" @click="showPicker = false">
           Annuler
@@ -85,7 +85,7 @@ useHead({ title: 'Wallet' })
 
 const route = useRoute()
 const { user } = useAuth()
-const { pending, error, linkWallet } = useWalletAuth()
+const { pending, step, error, linkWallet } = useWalletAuth()
 
 const wallets = computed(() => user.value?.wallets ?? [])
 const showPicker = ref(false)
