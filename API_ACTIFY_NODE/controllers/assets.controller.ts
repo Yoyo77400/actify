@@ -21,6 +21,8 @@ export async function create(req: Request, res: Response) {
     basePrice: body.basePrice,
     currency: body.currency,
     royaltyBps: body.royaltyBps,
+    fileIpfsCid: body.fileIpfsCid,
+    thumbnailCid: body.thumbnailCid,
   })
   sendSuccess(res, asset, undefined, 201)
 }
@@ -67,6 +69,8 @@ export async function update(req: Request, res: Response) {
     basePrice: body.basePrice,
     currency: body.currency,
     royaltyBps: body.royaltyBps,
+    fileIpfsCid: body.fileIpfsCid,
+    thumbnailCid: body.thumbnailCid,
   })
   sendSuccess(res, asset)
 }

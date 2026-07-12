@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { adminFlagAsset, adminRemoveAsset, adminRestoreAsset } from '~/composables/useAdminApi'
 
-definePageMeta({ layout: 'admin' })
+definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: 'Assets' })
 
 const store = useAdminStore()

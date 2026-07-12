@@ -7,7 +7,7 @@
       type="text"
       :placeholder="placeholder"
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-    />
+    >
     <button
       v-if="modelValue"
       class="text-muted hover:text-foreground border-0 bg-transparent p-0"

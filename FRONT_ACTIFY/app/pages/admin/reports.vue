@@ -37,7 +37,7 @@
 <script setup lang="ts">
 import { adminResolveReport, adminDismissReport } from '~/composables/useAdminApi'
 
-definePageMeta({ layout: 'admin' })
+definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: 'Reports' })
 
 const store = useAdminStore()

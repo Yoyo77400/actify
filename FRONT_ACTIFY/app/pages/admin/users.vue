@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { adminSuspendUser, adminBanUser, adminReactivateUser } from '~/composables/useAdminApi'
 
-definePageMeta({ layout: 'admin' })
+definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: 'Users' })
 
 const store = useAdminStore()

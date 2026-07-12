@@ -42,7 +42,7 @@
       <div class="border-t border-white/10 my-2" :class="isExpanded ? '' : 'mx-1'" />
 
       <NuxtLink
-        v-for="item in footerItems"
+        v-for="item in visibleFooterItems"
         :key="item.label"
         :to="item.to"
         class="sidebar-link"
@@ -89,12 +89,22 @@ const mainItems: SidebarItem[] = [
   { label: 'New', to: '/asset/new', icon: 'ph:plus-circle' },
 ]
   
-const footerItems: SidebarItem[] = [
+interface FooterItem extends SidebarItem {
+  adminOnly?: boolean
+}
+
+const footerItems: FooterItem[] = [
   { label: 'Profile', to: '/profile', icon: 'ph:user-circle' },
   { label: 'Settings', to: '/settings/security', icon: 'mdi:cog-outline' },
-  { label: 'Help', to: '/help', icon: 'ph:question' },
-  { label: 'Admin', to: '/admin', icon: 'ph:shield-check' },
+  { label: 'Admin', to: '/admin', icon: 'ph:shield-check', adminOnly: true },
 ]
+
+// The Admin entry is only rendered for admins — the route is guarded server-
+// side too (middleware 'admin'), this just hides the link from everyone else.
+const { user } = useAuth()
+const visibleFooterItems = computed(() =>
+  footerItems.filter((item) => !item.adminOnly || user.value?.role === 'admin'),
+)
 </script>
 
 <style scoped>

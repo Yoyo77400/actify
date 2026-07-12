@@ -2,7 +2,7 @@ import { getArtistMock, getAssetMock, homeMock } from '~/composables/useMarketpl
 import type { AssetDetailPayload, ArtistPayload, HomePayload } from '~/types/marketplace'
 
 // Base URL configurable : local en dev, IPFS en dev visant la simulation des fetchs de routes API. Les URLS seront ensuite remplacées par les vraies routes API
-const BASE = 'IPFS'
+const BASE = 'IPFS' as 'IPFS' | '/data'
 
 async function fetchWithFallback<T>(path: string, fallback: T) {
   if(BASE === '/data') {
@@ -31,5 +31,5 @@ export async function useArtistData(slug: string) {
 }
 
 export async function useAssetData(id: string) {
-  return await fetchWithFallback<AssetDetailPayload>(`assets/${id}.json`, getAssetMock(id))
+  return await fetchWithFallback<AssetDetailPayload>(`assets/${id}.json`, getAssetMock(id)!)
 }

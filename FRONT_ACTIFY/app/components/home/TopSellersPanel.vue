@@ -14,7 +14,7 @@
         class="flex items-center justify-between gap-3 pb-2.5 border-b border-line"
       >
         <div class="flex items-center gap-2.5">
-          <img class="w-9 h-9 rounded-[10px] object-cover" :src="seller.image" :alt="seller.name" />
+          <img class="w-9 h-9 rounded-[10px] object-cover" :src="seller.image" :alt="seller.name" >
           <div>
             <h3 class="ethnocentric m-0 text-sm">
               {{ seller.name }}

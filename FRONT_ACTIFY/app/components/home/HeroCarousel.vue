@@ -6,7 +6,7 @@
         class="absolute inset-0 w-full h-full object-cover brightness-[0.42]"
         :src="slide.image"
         :alt="slide.title"
-      />
+      >
     </transition>
     <div
       class="absolute inset-0"
@@ -56,7 +56,7 @@ const props = defineProps<{
 }>()
 
 const current = ref(0)
-const slide = computed(() => props.slides[current.value])
+const slide = computed(() => props.slides[current.value]!)
 
 function goTo(i: number) {
   current.value = i

@@ -19,23 +19,19 @@
         <p class="text-muted text-xs tracking-widest uppercase mt-1">Secure Gateway</p>
       </div>
 
-      <div class="w-full flex flex-col gap-3">
-        <AuthOAuthButton
-          provider="google"
-          :loading="pending === 'google'"
-          @click="signIn('google')"
-        />
-        <AuthOAuthButton
-          provider="github"
-          :loading="pending === 'github'"
-          @click="signIn('github')"
-        />
-      </div>
+      <AuthWalletPicker :pending="pending" :step="step" @select="loginWithWallet" />
+
+      <p v-if="error" class="text-red-400 text-xs text-center" role="alert">{{ error }}</p>
 
       <div class="w-full flex items-center gap-3">
         <div class="flex-1 h-px bg-line" />
-        <span class="text-muted text-xs tracking-widest uppercase">Curated Access</span>
+        <span class="text-muted text-xs tracking-widest uppercase">Bientôt</span>
         <div class="flex-1 h-px bg-line" />
+      </div>
+
+      <div class="w-full flex flex-col gap-3">
+        <AuthOAuthButton provider="google" disabled />
+        <AuthOAuthButton provider="github" disabled />
       </div>
 
       <p class="text-muted text-xs text-center leading-relaxed">
@@ -46,10 +42,13 @@
       </p>
     </div>
 
-    <p class="text-muted text-xs mt-6 relative z-10">
-      Nouveau sur Actify ?
-      <span class="text-accent cursor-pointer hover:underline">Demander une invitation</span>
-    </p>
+    <NuxtLink
+      to="/"
+      class="mt-6 relative z-10 flex items-center gap-1.5 text-muted text-xs hover:text-foreground transition-colors"
+    >
+      <Icon name="ph:arrow-left" class="text-sm" />
+      Explorer le marketplace sans se connecter
+    </NuxtLink>
 
     <footer class="absolute bottom-4 w-full px-6 flex items-center justify-between text-muted text-xs">
       <div class="flex gap-3.5 flex-wrap">
@@ -67,14 +66,13 @@ definePageMeta({ layout: 'auth' })
 
 useHead({ title: 'Connexion' })
 
-const { mockLogin } = useAuth()
-const pending = ref<'google' | 'github' | null>(null)
+const { isLoggedIn } = useAuth()
+const { pending, step, error, loginWithWallet } = useWalletAuth()
 
-async function signIn(provider: 'google' | 'github') {
-  pending.value = provider
-  await mockLogin(provider)
-  pending.value = null
+if (isLoggedIn.value) {
+  await navigateTo('/profile')
 }
+
 const date = new Date()
 const year = date.getFullYear()
 
