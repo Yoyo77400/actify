@@ -5,6 +5,7 @@ import * as creatorController from '../controllers/creator.controller'
 
 export const creatorRouter = Router()
 
+creatorRouter.get('/listings', requireAuth, requireRole('creator'), creatorController.getListings)
 creatorRouter.get('/stats', requireAuth, requireRole('creator'), creatorController.getStats)
 creatorRouter.get('/stats/revenue', requireAuth, requireRole('creator'), creatorController.getRevenue)
 // Per-asset ownership is enforced in the service (404 pattern).

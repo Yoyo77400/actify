@@ -12,6 +12,7 @@ const FULL_INCLUDE = {
   seller: true,
   listingCategories: { include: { category: true } },
   listingTags: { include: { tag: true } },
+  nft: true,
 } as const
 
 type FullListing = Awaited<ReturnType<typeof getFullListingOrThrow>>
@@ -28,6 +29,8 @@ export interface CreateAssetInput {
   basePrice?: number | null
   currency?: string | null
   royaltyBps?: number | null
+  fileIpfsCid?: string | null
+  thumbnailCid?: string | null
 }
 
 export type UpdateAssetInput = Partial<CreateAssetInput>
@@ -62,6 +65,12 @@ function serializeListing(listing: FullListing) {
     status: listing.status,
     viewsCount: listing.viewsCount,
     salesCount: listing.salesCount,
+    hasFile: listing.fileIpfsCid != null,
+    // Tokenization status: one asset = one XLS-20 NFToken once minted.
+    tokenized: listing.nft != null,
+    nft: listing.nft
+      ? { nftokenId: listing.nft.nftokenId, issuer: listing.nft.issuer, mintTxHash: listing.nft.mintTxHash }
+      : null,
     createdAt: listing.createdAt,
     seller: { id: listing.seller.id, username: listing.seller.username, displayName: listing.seller.displayName },
     categories: listing.listingCategories.map((lc) => ({
@@ -176,6 +185,8 @@ export async function createAsset(userId: string, input: CreateAssetInput) {
         price: input.basePrice ?? null,
         currency: input.currency ?? null,
         royaltyPercentage: input.royaltyBps != null ? input.royaltyBps / 100 : null,
+        fileIpfsCid: input.fileIpfsCid ?? null,
+        thumbnailCid: input.thumbnailCid ?? null,
       },
     })
 
@@ -214,6 +225,8 @@ export async function updateAsset(userId: string, listingId: string, input: Upda
   if (input.isFree !== undefined) data.isFree = input.isFree
   if (input.basePrice !== undefined) data.price = input.basePrice
   if (input.currency !== undefined) data.currency = input.currency
+  if (input.fileIpfsCid !== undefined) data.fileIpfsCid = input.fileIpfsCid
+  if (input.thumbnailCid !== undefined) data.thumbnailCid = input.thumbnailCid
 
   if (input.royaltyBps !== undefined) {
     if (input.royaltyBps != null) validateRoyaltyBps(input.royaltyBps)
@@ -254,6 +267,12 @@ export async function publishAsset(userId: string, listingId: string) {
   if (listing.status !== DRAFT) {
     throw new AppError(409, 'INVALID_ASSET_STATUS', `Impossible de publier un asset au statut ${listing.status}`)
   }
+  // One asset = one on-chain NFToken: an asset must be tokenized before it can
+  // go live on the marketplace.
+  const nft = await prisma.nft.findUnique({ where: { listingId } })
+  if (!nft) {
+    throw new AppError(409, 'NOT_TOKENIZED', 'Tokenisez l\'asset (mint XRPL) avant de le publier')
+  }
   await prisma.listing.update({ where: { id: listingId }, data: { status: PUBLISHED } })
   return serializeListing(await getFullListingOrThrow(listingId))
 }
@@ -286,7 +305,35 @@ export async function getAssetByIdOrSlug(idOrSlug: string, viewerUserId: string 
     listing.viewsCount += 1
   }
 
-  return serializeListing(listing)
+  // Detail view carries the rating aggregate (list views don't, to keep them cheap).
+  const rating = await prisma.review.aggregate({
+    where: { listingId: listing.id },
+    _avg: { rating: true },
+    _count: { _all: true },
+  })
+
+  return {
+    ...serializeListing(listing),
+    averageRating: rating._avg.rating != null ? Number(rating._avg.rating.toFixed(2)) : null,
+    reviewsCount: rating._count._all,
+  }
+}
+
+// A creator's own listings across ALL statuses (Draft/Published/Archived) so
+// they can manage drafts and tokenize/publish — GET /assets is Published-only.
+export async function listMyListings(userId: string, pagination: Pagination) {
+  const where = { sellerId: userId, deletedAt: null }
+  const [items, total] = await Promise.all([
+    prisma.listing.findMany({
+      where,
+      include: FULL_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      skip: pagination.skip,
+      take: pagination.limit,
+    }),
+    prisma.listing.count({ where }),
+  ])
+  return { items: items.map(serializeListing), meta: buildMeta(pagination.page, pagination.limit, total) }
 }
 
 function buildWhere(filters: AssetListFilters) {

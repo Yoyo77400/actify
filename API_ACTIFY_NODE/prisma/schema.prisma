@@ -110,6 +110,30 @@ model License {
   @@map("licenses")
 }
 
+// One asset = one XLS-20 NFToken minted on the XRP Ledger by its creator.
+// Written only after the on-chain NFTokenMint is verified (see tokenize
+// service): nftokenId + issuer are re-derived from the validated tx, never
+// trusted from the client.
+model Nft {
+  id             String   @id @default(uuid())
+  listingId      String   @unique @map("listing_id")
+  licenseId      Int?     @map("license_id")
+  nftokenId      String   @unique @map("nftoken_id")
+  issuer         String
+  taxon          Int      @default(0)
+  uri            String?
+  mintTxHash     String   @unique @map("mint_tx_hash")
+  currentOwnerId String   @map("current_owner_id")
+  mintedAt       DateTime @default(now()) @map("minted_at")
+
+  listing      Listing  @relation(fields: [listingId], references: [id])
+  license      License? @relation(fields: [licenseId], references: [id])
+  currentOwner User     @relation("NftOwner", fields: [currentOwnerId], references: [id])
+  resales      Resale[]
+
+  @@map("nfts")
+}
+
 model Listing {
   id                String    @id @default(uuid())
   sellerId          String    @map("seller_id")
@@ -228,22 +252,6 @@ model Favorite {
   @@map("favorites")
 }
 
-model Nft {
-  id              String   @id @default(uuid())
-  listingId       String   @unique @map("listing_id")
-  licenseId       Int      @map("license_id")
-  tokenId         String   @map("token_id")
-  contractAddress String   @map("contract_address")
-  currentOwnerId  String   @map("current_owner_id")
-  mintedAt        DateTime @default(now()) @map("minted_at")
-
-  listing      Listing  @relation(fields: [listingId], references: [id])
-  license      License  @relation(fields: [licenseId], references: [id])
-  currentOwner User     @relation("NftOwner", fields: [currentOwnerId], references: [id])
-  resales      Resale[]
-
-  @@map("nfts")
-}
 
 model Resale {
   id                String   @id @default(uuid())

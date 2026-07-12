@@ -33,6 +33,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       # Defaults to XRPL Testnet inside the code; override for mainnet.
       XRPL_RPC_URL: ${XRPL_RPC_URL:-https://s.altnet.rippletest.net:51234/}
+      # Wallet auto-promoted to admin on login (empty = disabled).
+      ADMIN_WALLET_ADDRESS: ${ADMIN_WALLET_ADDRESS:-}
     networks:
       - actify-prod
     depends_on:
