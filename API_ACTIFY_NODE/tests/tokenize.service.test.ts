@@ -49,16 +49,11 @@ describe('buildMintIntent', () => {
     // 2.5% royalty → TransferFee 2500 (units of 0.001%).
     expect(intent.transferFee).toBe(2500)
     expect(intent.flags).toBe(8) // tfTransferable
-    expect(intent.uri).toBe('ipfs://QmFileCid')
-    expect(intent.uriHex).toBe(Buffer.from('ipfs://QmFileCid', 'utf8').toString('hex').toUpperCase())
+    // Files are stored by Actify, so the NFT URI is a stable Actify reference.
+    expect(intent.uri).toBe('actify:asset:listing-1')
+    expect(intent.uriHex).toBe(Buffer.from('actify:asset:listing-1', 'utf8').toString('hex').toUpperCase())
     expect(intent.minters).toEqual(['rCreatorWallet'])
     expect(intent.nftokenTaxon).toBe(0)
-  })
-
-  it('uses an actify: fallback URI when the asset has no file CID', async () => {
-    listingFindFirst.mockResolvedValue({ ...draftListing, fileIpfsCid: null } as never)
-    const intent = await buildMintIntent(CREATOR, 'listing-1')
-    expect(intent.uri).toBe('actify:asset:listing-1')
   })
 
   it('caps TransferFee at 50000 for an out-of-range royalty', async () => {
@@ -97,7 +92,7 @@ describe('confirmMint', () => {
 
     const result = await confirmMint(CREATOR, 'listing-1', TX_HASH)
 
-    const expectedUriHex = Buffer.from('ipfs://QmFileCid', 'utf8').toString('hex').toUpperCase()
+    const expectedUriHex = Buffer.from('actify:asset:listing-1', 'utf8').toString('hex').toUpperCase()
     expect(verifyMint).toHaveBeenCalledWith({
       txHash: TX_HASH.toUpperCase(),
       minters: ['rCreatorWallet'],

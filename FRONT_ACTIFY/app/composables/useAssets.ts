@@ -32,5 +32,15 @@ export function useAssets() {
     publish: (id: string) => api.post<AssetCard>(`/assets/${id}/publish`),
     myListings: () => api.get<AssetCard[]>('/creator/listings'),
     createOrder: (assetId: string) => api.post<OrderCreated>('/orders', { assetId }),
+    uploadFile: (id: string, file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return api.post<{ hasFile: boolean }>(`/assets/${id}/file`, fd)
+    },
+    uploadThumbnail: (id: string, file: File) => {
+      const fd = new FormData()
+      fd.append('thumbnail', file)
+      return api.post<{ thumbnailCid: string }>(`/assets/${id}/thumbnail`, fd)
+    },
   }
 }

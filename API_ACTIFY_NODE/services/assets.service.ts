@@ -29,8 +29,6 @@ export interface CreateAssetInput {
   basePrice?: number | null
   currency?: string | null
   royaltyBps?: number | null
-  fileIpfsCid?: string | null
-  thumbnailCid?: string | null
 }
 
 export type UpdateAssetInput = Partial<CreateAssetInput>
@@ -190,8 +188,6 @@ export async function createAsset(userId: string, input: CreateAssetInput) {
         price: input.basePrice ?? null,
         currency: input.currency ?? null,
         royaltyPercentage: input.royaltyBps != null ? input.royaltyBps / 100 : null,
-        fileIpfsCid: input.fileIpfsCid ?? null,
-        thumbnailCid: input.thumbnailCid ?? null,
       },
     })
 
@@ -230,8 +226,6 @@ export async function updateAsset(userId: string, listingId: string, input: Upda
   if (input.isFree !== undefined) data.isFree = input.isFree
   if (input.basePrice !== undefined) data.price = input.basePrice
   if (input.currency !== undefined) data.currency = input.currency
-  if (input.fileIpfsCid !== undefined) data.fileIpfsCid = input.fileIpfsCid
-  if (input.thumbnailCid !== undefined) data.thumbnailCid = input.thumbnailCid
 
   if (input.royaltyBps !== undefined) {
     if (input.royaltyBps != null) validateRoyaltyBps(input.royaltyBps)

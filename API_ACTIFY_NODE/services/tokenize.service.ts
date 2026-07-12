@@ -23,12 +23,12 @@ function stringToHex(input: string): string {
 // The single source of truth for the NFTokenMint an asset must carry, shared
 // by intent (what the wallet is told to sign) and confirm (what must match
 // on-chain). Deterministic from the listing.
-function mintParamsFor(listing: { id: string; fileIpfsCid: string | null; royaltyPercentage: unknown }) {
+function mintParamsFor(listing: { id: string; royaltyPercentage: unknown }) {
   const royaltyPercent = listing.royaltyPercentage != null ? Number(listing.royaltyPercentage) : 0
   const transferFee = Math.min(MAX_TRANSFER_FEE, Math.round(royaltyPercent * TRANSFER_FEE_PER_PERCENT))
-  // Point the NFT at its content when available, else a stable Actify
-  // reference. Not validated on-chain, so kept short (URI blob ≤ 256 bytes).
-  const uri = listing.fileIpfsCid ? `ipfs://${listing.fileIpfsCid}` : `actify:asset:${listing.id}`
+  // Files are stored by Actify (not IPFS), so the NFT URI is a stable Actify
+  // reference to the asset. Deterministic and short (URI blob ≤ 256 bytes).
+  const uri = `actify:asset:${listing.id}`
   return { uri, uriHex: stringToHex(uri), taxon: NFT_TAXON, transferFee }
 }
 

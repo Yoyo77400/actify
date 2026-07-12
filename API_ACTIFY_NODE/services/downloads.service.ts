@@ -1,3 +1,4 @@
+import { extname } from 'node:path'
 import jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
 import { AppError, buildMeta } from '../utils/http'
@@ -7,7 +8,6 @@ const PUBLISHED = 'Published'
 const PURCHASE_CONFIRMED = 'Confirmed'
 const DOWNLOAD_TOKEN_TTL = '1h'
 const DOWNLOAD_TOKEN_TTL_MS = 60 * 60 * 1000
-const IPFS_GATEWAY_BASE_URL = 'https://ipfs.io/ipfs'
 
 const HISTORY_LISTING_SELECT = { id: true, slug: true, title: true, thumbnailCid: true } as const
 
@@ -79,8 +79,9 @@ export async function requestDownload(userId: string, listingId: string) {
 
 // The signed token is the sole proof this request is authorized, but the
 // entitlement is re-checked against live state (ban, unpublish, refund) so a
-// token issued minutes ago can't outlive the right it represents.
-export async function resolveDownloadUrl(token: string): Promise<string> {
+// token issued minutes ago can't outlive the right it represents. Returns the
+// storage key of the file to stream plus a friendly download filename.
+export async function resolveDownloadFile(token: string): Promise<{ key: string; downloadName: string }> {
   let payload: jwt.JwtPayload
   try {
     payload = jwt.verify(token, process.env.JWT_SECRET!) as jwt.JwtPayload
@@ -100,7 +101,7 @@ export async function resolveDownloadUrl(token: string): Promise<string> {
   const listing = await getDownloadableListingOrThrow(payload.listingId)
   await assertEntitled(payload.sub, listing)
 
-  return `${IPFS_GATEWAY_BASE_URL}/${payload.cid}`
+  return { key: payload.cid, downloadName: `${listing.slug ?? 'asset'}${extname(payload.cid)}` }
 }
 
 export async function listMyDownloads(userId: string, pagination: Pagination) {

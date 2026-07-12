@@ -286,9 +286,7 @@ const loadError = computed<LoadFailure | null>(() => {
 const thumbnailUrl = computed(() => {
   const a = asset.value
   if (!a) return ''
-  return a.thumbnailCid
-    ? `https://ipfs.io/ipfs/${a.thumbnailCid}`
-    : `https://picsum.photos/seed/${a.id}/600/400`
+  return assetImage(a.thumbnailCid, a.id)
 })
 
 const sellerName = computed(() => {

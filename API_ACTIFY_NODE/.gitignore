@@ -4,3 +4,6 @@ node_modules
 !.env.example
 
 /generated/prisma
+
+# Uploaded asset files (local storage)
+uploads/
