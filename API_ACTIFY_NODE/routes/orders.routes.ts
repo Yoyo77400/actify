@@ -6,6 +6,7 @@ export const ordersRouter = Router()
 
 ordersRouter.post('/', requireAuth, ordersController.create)
 ordersRouter.get('/', requireAuth, ordersController.list)
+ordersRouter.get('/pending/:assetId', requireAuth, ordersController.getPendingForAsset)
 ordersRouter.get('/:id', requireAuth, ordersController.getById)
 // TODO(auth2): gate behind TOTP once 2FA enrollment exists (Bearer token + TOTP per spec).
 ordersRouter.post('/:id/confirm', requireAuth, ordersController.confirm)

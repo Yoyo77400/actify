@@ -3,8 +3,6 @@ import type {
   AssetDetail,
   CategoryWithCount,
   CreateAssetBody,
-  OrderConfirmation,
-  OrderCreated,
 } from '~/types/asset'
 
 export interface AssetListParams {
@@ -38,9 +36,6 @@ export function useAssets() {
     create: (body: CreateAssetBody) => api.post<AssetCard>('/assets', body),
     publish: (id: string) => api.post<AssetCard>(`/assets/${id}/publish`),
     myListings: () => api.get<AssetCard[]>('/creator/listings'),
-    createOrder: (assetId: string) => api.post<OrderCreated>('/orders', { assetId }),
-    confirmOrder: (orderId: string, txHash: string) =>
-      api.post<OrderConfirmation>(`/orders/${orderId}/confirm`, { txHash }),
     uploadFile: (id: string, file: File) => {
       const fd = new FormData()
       fd.append('file', file)

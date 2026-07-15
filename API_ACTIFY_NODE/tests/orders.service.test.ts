@@ -15,7 +15,14 @@ vi.mock('../services/chains/xrpl-payment', () => ({
 
 import { prisma } from '../services/prisma'
 import { verifyXrplPayment } from '../services/chains/xrpl-payment'
-import { cancelOrder, confirmOrder, createOrder, getOrder, listOrders } from '../services/orders.service'
+import {
+  cancelOrder,
+  confirmOrder,
+  createOrder,
+  getOrder,
+  getPendingOrderForAsset,
+  listOrders,
+} from '../services/orders.service'
 
 const listingFindFirst = vi.mocked(prisma.listing.findFirst)
 const purchaseCount = vi.mocked(prisma.purchase.count)
@@ -232,6 +239,36 @@ describe('listOrders', () => {
         take: 20,
       }),
     )
+  })
+})
+
+describe('getPendingOrderForAsset', () => {
+  it('returns the newest pending order with the payment instructions needed after a refresh', async () => {
+    purchaseFindFirst.mockResolvedValue({
+      ...pendingOrder,
+      listing: { ...listingSummary, currency: 'XRP' },
+    } as never)
+
+    const order = await getPendingOrderForAsset(BUYER_ID, 'listing-1')
+
+    expect(order).toMatchObject({
+      id: 'order-1',
+      status: 'Pending',
+      currency: 'XRP',
+      paymentAddress: 'rSellerAddress',
+      paymentTag: 42,
+      expiresAt: new Date('2026-01-01T00:30:00Z'),
+    })
+    expect(purchaseFindFirst).toHaveBeenCalledWith({
+      where: { buyerId: BUYER_ID, listingId: 'listing-1', status: 'Pending' },
+      include: expect.any(Object),
+      orderBy: { purchasedAt: 'desc' },
+    })
+  })
+
+  it('returns null when the buyer has no pending order for the asset', async () => {
+    purchaseFindFirst.mockResolvedValue(null)
+    await expect(getPendingOrderForAsset(BUYER_ID, 'listing-1')).resolves.toBeNull()
   })
 })
 

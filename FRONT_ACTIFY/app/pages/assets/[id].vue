@@ -286,6 +286,7 @@ type LoadResult =
 
 const route = useRoute()
 const assets = useAssets()
+const orders = useOrders()
 const { user, isLoggedIn } = useAuth()
 
 const assetId = String(route.params.id)
@@ -354,7 +355,16 @@ function truncateMiddle(value: string, head = 10, tail = 8): string {
 }
 
 // ─── Buy flow ───
-const order = ref<OrderCreated | null>(null)
+const { data: recoveredOrder } = await useAsyncData<OrderCreated | null>(
+  `pending-order:${user.value?.id ?? 'guest'}:${assetId}`,
+  async () => {
+    const currentAsset = asset.value
+    if (!isLoggedIn.value || !currentAsset || currentAsset.isFree || isOwner.value) return null
+    return orders.getPendingForAsset(currentAsset.id)
+  },
+)
+
+const order = ref<OrderCreated | null>(recoveredOrder.value ?? null)
 const ordering = ref(false)
 const orderError = ref<string | null>(null)
 const orderErrorCode = ref<string | null>(null)
@@ -371,7 +381,7 @@ async function buy() {
   orderError.value = null
   orderErrorCode.value = null
   try {
-    order.value = await assets.createOrder(a.id)
+    order.value = await orders.create(a.id)
   } catch (err) {
     const apiErr = toApiError(err)
     orderErrorCode.value = apiErr?.code ?? null
@@ -389,7 +399,7 @@ async function confirmPayment() {
   confirming.value = true
   confirmError.value = null
   try {
-    const confirmed = await assets.confirmOrder(pendingOrder.id, txHash.value)
+    const confirmed = await orders.confirm(pendingOrder.id, txHash.value)
     pendingOrder.status = confirmed.status
     confirmedTxHash.value = confirmed.txHash
     await refresh()
