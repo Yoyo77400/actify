@@ -7,3 +7,4 @@ node_modules
 
 # Uploaded asset files (local storage)
 uploads/
+tests_documentation.md
