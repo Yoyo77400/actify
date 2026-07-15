@@ -90,3 +90,9 @@ export interface OrderCreated {
   paymentTag: number
   expiresAt: string
 }
+
+export interface OrderConfirmation {
+  id: string
+  status: string
+  txHash: string | null
+}

@@ -1,4 +1,11 @@
-import type { AssetCard, AssetDetail, CategoryWithCount, CreateAssetBody, OrderCreated } from '~/types/asset'
+import type {
+  AssetCard,
+  AssetDetail,
+  CategoryWithCount,
+  CreateAssetBody,
+  OrderConfirmation,
+  OrderCreated,
+} from '~/types/asset'
 
 export interface AssetListParams {
   q?: string
@@ -32,6 +39,8 @@ export function useAssets() {
     publish: (id: string) => api.post<AssetCard>(`/assets/${id}/publish`),
     myListings: () => api.get<AssetCard[]>('/creator/listings'),
     createOrder: (assetId: string) => api.post<OrderCreated>('/orders', { assetId }),
+    confirmOrder: (orderId: string, txHash: string) =>
+      api.post<OrderConfirmation>(`/orders/${orderId}/confirm`, { txHash }),
     uploadFile: (id: string, file: File) => {
       const fd = new FormData()
       fd.append('file', file)
