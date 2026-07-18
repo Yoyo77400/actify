@@ -1,100 +1,90 @@
-export type UserRole = 'user' | 'artist' | 'moderator' | 'admin'
-export type UserStatus = 'active' | 'suspended' | 'banned'
-export type SaleStatus = 'completed' | 'pending' | 'disputed' | 'cancelled' | 'refunded'
-export type AssetStatus = 'listed' | 'unlisted' | 'flagged' | 'removed'
-export type ReportReason = 'scam' | 'copyright' | 'inappropriate' | 'fake' | 'other'
-export type ReportStatus = 'open' | 'reviewing' | 'resolved' | 'dismissed'
+// Shapes returned by the admin API (see API_ACTIFY_NODE/services/admin.service.ts
+// serializers — the source of truth). All admin endpoints require Bearer + admin role.
 
-export interface AdminUser {
-  id: string
-  displayName: string
-  username: string
-  email: string
-  avatar: string
-  role: UserRole
-  status: UserStatus
-  wallet: string
-  joinedAt: string
-  salesCount: number
-  totalVolume: string
-  lastActiveAt: string
+/** Statuses accepted by PUT /admin/assets/:id/status. */
+export const ADMIN_ASSET_STATUSES = ['Draft', 'Published', 'Archived', 'Suspended'] as const
+export type AdminAssetStatus = (typeof ADMIN_ASSET_STATUSES)[number]
+
+/** Purchase lifecycle statuses (see orders.service ORDER_* constants). */
+export const ADMIN_ORDER_STATUSES = ['Pending', 'Confirmed', 'Cancelled'] as const
+export type AdminOrderStatus = (typeof ADMIN_ORDER_STATUSES)[number]
+
+/** Pagination envelope meta echoed by every admin list endpoint. */
+export interface PageMeta {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
 }
 
-export interface AdminSale {
+export interface AdminUserRef {
   id: string
-  assetName: string
-  assetImage: string
-  seller: string
-  buyer: string
-  price: string
-  currency: string
-  chain: string
-  status: SaleStatus
-  createdAt: string
-  txHash: string
+  username: string | null
+  displayName: string | null
 }
 
+/** Item of GET /admin/assets (soft-deleted rows included). */
 export interface AdminAsset {
   id: string
-  name: string
-  image: string
-  creator: string
-  collection: string
-  price: string
-  currency: string
-  chain: string
-  status: AssetStatus
-  mintedAt: string
+  slug: string | null
+  title: string
+  isFree: boolean
+  // Prisma Decimal serializes to a string over JSON.
+  price: string | null
+  currency: string | null
+  status: AdminAssetStatus
+  viewsCount: number
   salesCount: number
-  reportCount: number
-}
-
-export interface AdminReport {
-  id: string
-  reason: ReportReason
-  description: string
-  targetType: 'user' | 'asset' | 'sale'
-  targetId: string
-  targetName: string
-  reportedBy: string
-  status: ReportStatus
   createdAt: string
+  deletedAt: string | null
+  seller: AdminUserRef
 }
 
-export interface AdminDashboardStats {
+/** Item of GET /admin/users. */
+export interface AdminUser {
+  id: string
+  username: string | null
+  displayName: string | null
+  email: string | null
+  avatarCid: string | null
+  role: string
+  isVerified: boolean
+  isBanned: boolean
+  createdAt: string
+  deletedAt: string | null
+}
+
+/** GET /admin/users/:id — list shape plus bio, wallets and counters. */
+export interface AdminUserDetail extends AdminUser {
+  bio: string | null
+  wallets: Array<{
+    id: string
+    address: string
+    chain: string
+    label: string | null
+    isPrimary: boolean
+    createdAt: string
+  }>
+  stats: { listingsCount: number; purchasesCount: number }
+}
+
+/** Item of GET /admin/orders. txHash is null while the payment is pending. */
+export interface AdminOrder {
+  id: string
+  buyer: AdminUserRef
+  listing: { id: string; title: string; slug: string | null }
+  txHash: string | null
+  amountPaid: number
+  status: AdminOrderStatus
+  purchasedAt: string
+}
+
+/** GET /admin/stats. byStatus keys: Draft / Published / Archived / Suspended. */
+export interface AdminStats {
   totalUsers: number
-  activeUsers: number
-  totalSales: number
-  totalVolume: string
-  pendingReports: number
-  flaggedAssets: number
-  userGrowth: number
-  salesGrowth: number
-  volumeGrowth: number
-}
-
-export interface AdminDashboardPayload {
-  stats: AdminDashboardStats
-  recentSales: AdminSale[]
-  recentReports: AdminReport[]
-}
-
-export interface AdminUsersPayload {
-  users: AdminUser[]
-  total: number
-}
-
-export interface AdminSalesPayload {
-  sales: AdminSale[]
-  total: number
-}
-
-export interface AdminAssetsPayload {
-  assets: AdminAsset[]
-  total: number
-}
-
-export interface AdminReportsPayload {
-  reports: AdminReport[]
-  total: number
+  bannedUsers: number
+  totalAssets: number
+  byStatus: Record<string, number>
+  totalOrders: number
+  confirmedRevenue: number
 }

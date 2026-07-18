@@ -1,22 +1,29 @@
 <template>
-  <aside class="surface overflow-hidden min-h-[280px]">
-    <div
-      class="min-h-[340px] grid place-items-center text-white/92 text-[clamp(42px,5vw,74px)] font-light tracking-[0.08em]"
-      style="background: linear-gradient(180deg, #7d7d7d 0%, #9d9d9d 100%); writing-mode: vertical-rl; transform: rotate(180deg)"
-    >
-      FILTRES
+  <aside class="surface p-4 flex flex-col gap-4 h-fit">
+    <div>
+      <p class="m-0 text-muted text-xs uppercase tracking-wider">À propos</p>
+      <p class="mt-2 mb-0 text-muted text-[13px] leading-relaxed">
+        {{ artist.bio ?? 'Cet artiste n\'a pas encore de bio.' }}
+      </p>
     </div>
-    <div class="p-3.5">
-      <p class="m-0 text-muted text-[13px]">{{ artist.bio }}</p>
-      <p class="mt-2.5 mb-0 text-muted text-[13px]">{{ artist.followersLabel }}</p>
+
+    <div class="border-t border-line pt-3 flex flex-col gap-2">
+      <div class="flex items-center justify-between text-[13px]">
+        <span class="text-muted">Assets publiés</span>
+        <span class="text-foreground font-medium">{{ artist.stats.listingsCount }}</span>
+      </div>
+      <div class="flex items-center justify-between text-[13px]">
+        <span class="text-muted">Avis rédigés</span>
+        <span class="text-foreground font-medium">{{ artist.stats.reviewsCount }}</span>
+      </div>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import type { ArtistIdentity } from '~/types/marketplace'
+import type { PublicProfile } from '~/types/marketplace'
 
 defineProps<{
-  artist: ArtistIdentity
+  artist: PublicProfile
 }>()
 </script>

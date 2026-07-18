@@ -81,12 +81,12 @@ function onMouseLeave() {
   }
 }
 
+// Artist pages are reached from asset cards (no artist directory endpoint);
+// the old hardcoded demo links to /artist/boto/* are gone with the mock era.
 const mainItems: SidebarItem[] = [
-  { label: 'Discover', to: '/', icon: 'ph:compass' },
+  { label: 'Découvrir', to: '/', icon: 'ph:compass' },
   { label: 'Assets', to: '/assets', icon: 'ph:cube' },
-  { label: 'Artists', to: '/artist/boto/items', icon: 'ph:palette' },
-  { label: 'Collections', to: '/artist/boto/collections', icon: 'mdi:view-dashboard-outline' },
-  { label: 'New', to: '/asset/new', icon: 'ph:plus-circle' },
+  { label: 'Publier', to: '/asset/new', icon: 'ph:plus-circle' },
 ]
   
 interface FooterItem extends SidebarItem {

@@ -1,54 +1,54 @@
 <template>
-  <section class="surface relative overflow-hidden min-h-[320px] mb-[18px]">
-    <img class="absolute inset-0 w-full h-full object-cover brightness-[0.42]" :src="artist.cover" :alt="artist.displayName" >
+  <section class="surface relative overflow-hidden mb-[18px]">
+    <!-- The public profile API exposes no cover image — decorative gradient instead. -->
     <div
-      class="absolute inset-0"
-      style="background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.74))"
+      class="absolute inset-0 pointer-events-none"
+      style="background: radial-gradient(circle at 15% 20%, rgba(35,99,255,0.28), transparent 45%), radial-gradient(circle at 85% 80%, rgba(240,255,61,0.12), transparent 40%);"
     />
 
-    <div class="relative z-10 pt-7 px-6 pb-[18px] flex flex-col justify-end min-h-[320px]">
+    <div class="relative z-10 pt-7 px-6 pb-6 flex flex-col justify-end min-h-[220px]">
       <div class="flex items-end gap-4 max-sm:flex-col max-sm:items-start">
         <img
+          v-if="avatarUrl"
           class="w-[92px] h-[92px] rounded-full object-cover border-2 border-white/18"
-          :src="artist.avatar"
-          :alt="artist.displayName"
+          :src="avatarUrl"
+          :alt="name"
         >
+        <!-- No avatar uploaded — neutral local tile, no third-party placeholder service. -->
+        <div
+          v-else
+          class="w-[92px] h-[92px] rounded-full border-2 border-white/18 bg-panel-3 grid place-items-center shrink-0"
+        >
+          <Icon name="ph:user" class="text-3xl text-muted" />
+        </div>
         <div>
-          <h1 class="ethnocentric m-0 text-[clamp(28px,4vw,44px)]">{{ artist.displayName }}</h1>
+          <h1 class="ethnocentric m-0 text-[clamp(28px,4vw,44px)]">{{ name }}</h1>
           <div class="flex gap-2.5 flex-wrap mt-2.5">
-            <span class="pill-badge">{{ artist.joinedAt }}</span>
-            <span class="pill-badge">{{ artist.wallet }}</span>
+            <span v-if="artist.username" class="pill-badge">@{{ artist.username }}</span>
+            <span class="pill-badge">Inscrit le {{ joinedLabel }}</span>
+            <span v-if="artist.isVerified" class="pill-badge text-accent-2">
+              <Icon name="ph:seal-check" class="text-sm" />
+              Vérifié
+            </span>
           </div>
         </div>
       </div>
-
-      <nav class="flex gap-[18px] mt-[26px] max-sm:flex-wrap" aria-label="Navigation artiste">
-        <NuxtLink
-          :to="`/artist/${artist.slug}/collections`"
-          class="pb-2.5 border-b-3 border-transparent text-muted no-underline"
-          :class="{ '!text-foreground !border-white': activeTab === 'collections' }"
-        >
-          Collections
-        </NuxtLink>
-        <NuxtLink
-          :to="`/artist/${artist.slug}/items`"
-          class="pb-2.5 border-b-3 border-transparent text-muted no-underline"
-          :class="{ '!text-foreground !border-white': activeTab === 'items' }"
-        >
-          Items
-        </NuxtLink>
-        <span class="pb-2.5 border-b-3 border-transparent text-muted cursor-default">Listed</span>
-        <span class="pb-2.5 border-b-3 border-transparent text-muted cursor-default">Activity</span>
-      </nav>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import type { ArtistIdentity } from '~/types/marketplace'
+import type { PublicProfile } from '~/types/marketplace'
 
-defineProps<{
-  artist: ArtistIdentity
-  activeTab: 'collections' | 'items'
-}>()
+const props = defineProps<{ artist: PublicProfile }>()
+
+const name = computed(() => props.artist.displayName ?? props.artist.username ?? 'Artiste')
+
+// Avatar served by our own API — no third-party gateway (privacy policy).
+const avatarUrl = computed(() => fileUrl(props.artist.avatarCid))
+
+// Pinned timezone: SSR-rendered, keep server and client output identical.
+const joinedLabel = computed(() =>
+  new Date(props.artist.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'Europe/Paris' }),
+)
 </script>

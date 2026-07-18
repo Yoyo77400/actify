@@ -1,15 +1,46 @@
-export interface User {
+// Shapes returned by the public users API (see API_ACTIFY_NODE/services/users.service.ts):
+// GET /users/:username (serializePublic + stats) and GET /users/:username/assets.
+
+export interface PublicProfileStats {
+  listingsCount: number
+  reviewsCount: number
+}
+
+export interface PublicProfile {
   id: string
-  email: string
-  displayName: string
-  username: string
-  role: 'visitor' | 'user' | 'creator' | 'admin'
-  avatar: string
-  bio: string
-  wallet: string | null
-  totpEnabled: boolean
+  username: string | null
+  displayName: string | null
+  bio: string | null
+  avatarCid: string | null
+  role: string
+  isVerified: boolean
+  createdAt: string
+  stats: PublicProfileStats
+}
+
+// Item of GET /users/:username/assets: whitelisted public columns only
+// (always Published, not soft-deleted — the API keeps fileIpfsCid and other
+// internals out of the payload). Decimal columns (price) serialize to strings
+// over JSON.
+export interface PublicListing {
+  id: string
+  slug: string | null
+  title: string
+  shortDescription: string | null
+  description: string | null
+  thumbnailCid: string | null
+  isFree: boolean
+  price: string | null
+  currency: string | null
+  viewsCount: number
+  salesCount: number
   createdAt: string
 }
+
+// ─── Legacy mock-era display types ───
+// Not API shapes. Kept ONLY because unused components outside this refactor's
+// scope still import them (components/home/*, components/asset/AssetInfoPanel,
+// components/asset/AssetPreview). Delete together with those dead components.
 
 export interface CategoryChip {
   id: string
@@ -87,41 +118,6 @@ export interface WeeklyShowcase {
   items: WeeklySaleItem[]
 }
 
-export interface HomePayload {
-  categories: CategoryChip[]
-  chains: CategoryChip[]
-  hero: HeroSlide[]
-  trendingTokens: MarketToken[]
-  featuredCollections: CollectionCard[]
-  trendingCollections: MarketToken[]
-  featuredDrops: DropCard[]
-  topMovers: CollectionCard[]
-  featuredTokens: CollectionCard[]
-  nft101: EducationCard[]
-  topSellers: SellerRow[]
-  weeklyShowcase: WeeklyShowcase
-}
-
-export interface ArtistIdentity {
-  slug: string
-  displayName: string
-  username: string
-  avatar: string
-  cover: string
-  joinedAt: string
-  wallet: string
-  bio: string
-  followersLabel: string
-}
-
-export interface ArtistCollection {
-  id: string
-  name: string
-  image: string
-  description: string
-  buttonLabel: string
-}
-
 export interface ArtistAsset {
   id: string
   name: string
@@ -138,17 +134,4 @@ export interface ArtistAsset {
   popularity: number
   salesCount: number
   lastSaleLabel: string
-}
-
-export interface ArtistPayload {
-  artist: ArtistIdentity
-  collections: ArtistCollection[]
-  items: ArtistAsset[]
-}
-
-export interface AssetDetailPayload {
-  asset: ArtistAsset
-  collectionName: string
-  creatorVerified?: boolean
-  tabs: Array<{ id: 'description' | 'orders' | 'activity'; label: string }>
 }

@@ -2,14 +2,14 @@
   <Teleport to="body">
     <div v-if="store.confirmOpen" class="modal-overlay" @click.self="store.cancelConfirm">
       <div class="surface modal-box">
-        <h3 class="m-0 text-lg font-semibold">Confirm action</h3>
+        <h3 class="m-0 text-lg font-semibold">Confirmer l'action</h3>
         <p class="mt-3 mb-0 text-muted text-sm leading-relaxed">{{ store.confirmMessage }}</p>
         <div class="flex gap-2.5 justify-end mt-5">
           <button class="ghost-btn text-sm" type="button" @click="store.cancelConfirm">
-            Cancel
+            Annuler
           </button>
           <button class="primary-btn text-sm" type="button" @click="store.executeConfirm">
-            Confirm
+            Confirmer
           </button>
         </div>
       </div>

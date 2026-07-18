@@ -1,67 +1,132 @@
 <template>
   <div class="flex flex-col gap-5">
-    <div class="flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
-      <div>
-        <h1 class="ethnocentric m-0 text-2xl">Sales</h1>
-        <p class="mt-1 mb-0 text-muted text-sm">{{ total }} transactions</p>
-      </div>
-      <AdminSearchBar v-model="store.search" placeholder="Search sales..." />
+    <!-- No search bar: GET /admin/orders only supports a status filter. -->
+    <div>
+      <h1 class="ethnocentric m-0 text-2xl">Ventes</h1>
+      <p class="mt-1 mb-0 text-muted text-sm">{{ meta?.total ?? 0 }} commande{{ (meta?.total ?? 0) > 1 ? 's' : '' }}</p>
     </div>
 
     <div class="flex gap-2 scroll-x">
       <button
         v-for="f in filters"
-        :key="f.value"
+        :key="f.label"
         class="chip shrink-0"
-        :class="{ 'chip--active': store.saleFilter === f.value }"
+        :class="{ 'chip--active': filter === f.value }"
         type="button"
-        @click="store.saleFilter = f.value"
+        @click="filter = f.value"
       >
         {{ f.label }}
       </button>
     </div>
 
+    <p v-if="errorMsg" class="surface p-4 text-danger text-sm" role="alert">{{ errorMsg }}</p>
+
     <div class="surface overflow-hidden">
-      <AdminSaleRow
-        v-for="sale in filtered"
-        :key="sale.id"
-        :sale="sale"
-        @cancel="onCancel"
-        @refund="onRefund"
-        @delete="onDelete"
+      <AdminSaleRow v-for="order in orders" :key="order.id" :order="order" />
+      <AdminEmptyState
+        v-if="!orders.length && !loading && !errorMsg"
+        message="Aucune commande ne correspond aux filtres"
+        icon="ph:receipt"
       />
-      <AdminEmptyState v-if="!filtered.length" message="No sales match your filters" icon="ph:receipt" />
+    </div>
+
+    <div v-if="loading" class="flex justify-center py-4">
+      <span class="w-6 h-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+    </div>
+
+    <div v-if="meta && meta.totalPages > 1" class="flex items-center justify-center gap-3 pt-2">
+      <button type="button" class="ghost-btn text-sm" :disabled="page <= 1 || loading" @click="goToPage(page - 1)">
+        Précédent
+      </button>
+      <span class="text-muted text-sm">Page {{ meta.page }} / {{ meta.totalPages }}</span>
+      <button
+        type="button"
+        class="ghost-btn text-sm"
+        :disabled="page >= meta.totalPages || loading"
+        @click="goToPage(page + 1)"
+      >
+        Suivant
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { adminCancelSale, adminRefundSale, adminDeleteSale } from '~/composables/useAdminApi'
+import type { AdminOrder, AdminOrderStatus, PageMeta } from '~/types/admin'
+import type { AdminOrderListParams } from '~/composables/useAdminApi'
+
+const PAGE_SIZE = 20
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: 'Sales' })
+useHead({ title: 'Ventes' })
 
-const store = useAdminStore()
-const { data } = await useAdminSales()
-const total = computed(() => data.value.total)
-const filtered = computed(() => store.filterSales(data.value.sales))
+const adminApi = useAdminApi()
 
-const filters = [
-  { label: 'All', value: 'all' as const },
-  { label: 'Completed', value: 'completed' as const },
-  { label: 'Pending', value: 'pending' as const },
-  { label: 'Disputed', value: 'disputed' as const },
-  { label: 'Cancelled', value: 'cancelled' as const },
-  { label: 'Refunded', value: 'refunded' as const },
+const filter = ref<AdminOrderStatus | undefined>(undefined)
+const page = ref(1)
+
+const orders = ref<AdminOrder[]>([])
+const meta = ref<PageMeta | null>(null)
+const loading = ref(false)
+const errorMsg = ref<string | null>(null)
+
+const filters: Array<{ label: string; value: AdminOrderStatus | undefined }> = [
+  { label: 'Toutes', value: undefined },
+  { label: 'En attente', value: 'Pending' },
+  { label: 'Confirmées', value: 'Confirmed' },
+  { label: 'Annulées', value: 'Cancelled' },
 ]
 
-function onCancel(id: string) {
-  store.requestConfirm('Cancel this sale?', () => adminCancelSale(id))
+function buildParams(): AdminOrderListParams {
+  return { status: filter.value, page: page.value, limit: PAGE_SIZE }
 }
-function onRefund(id: string) {
-  store.requestConfirm('Refund this sale? Funds will be returned to the buyer.', () => adminRefundSale(id))
+
+// Monotonic token: discard stale responses after a filter change mid-flight.
+let requestSeq = 0
+
+async function fetchOrders() {
+  const seq = ++requestSeq
+  loading.value = true
+  errorMsg.value = null
+  try {
+    const result = await adminApi.listOrders(buildParams())
+    if (seq !== requestSeq) return
+    orders.value = result.items
+    meta.value = result.meta
+  } catch (err) {
+    if (seq !== requestSeq) return
+    errorMsg.value = toApiError(err)?.message
+      ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'Impossible de charger les commandes.')
+  } finally {
+    if (seq === requestSeq) loading.value = false
+  }
 }
-function onDelete(id: string) {
-  store.requestConfirm('Permanently delete this sale record?', () => adminDeleteSale(id))
+
+const { data: first } = await useAsyncData('admin-orders', async () => {
+  try {
+    return { ok: true as const, ...(await adminApi.listOrders(buildParams())) }
+  } catch (err) {
+    return {
+      ok: false as const,
+      message: toApiError(err)?.message
+        ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'Impossible de charger les commandes.'),
+    }
+  }
+})
+if (first.value?.ok) {
+  orders.value = first.value.items
+  meta.value = first.value.meta
+} else if (first.value) {
+  errorMsg.value = first.value.message
+}
+
+watch(filter, () => {
+  page.value = 1
+  fetchOrders()
+})
+
+function goToPage(target: number) {
+  page.value = target
+  fetchOrders()
 }
 </script>

@@ -249,20 +249,44 @@ describe('setUserBanStatus', () => {
 
 describe('updateUserRole', () => {
   it('rejects a missing role name', async () => {
-    await expect(updateUserRole('u1', '')).rejects.toMatchObject({ status: 400, code: 'VALIDATION_ERROR' })
+    await expect(updateUserRole('admin-1', 'u1', '')).rejects.toMatchObject({ status: 400, code: 'VALIDATION_ERROR' })
     expect(roleFindFirst).not.toHaveBeenCalled()
   })
 
   it('throws 404 when the role name is not seeded', async () => {
     roleFindFirst.mockResolvedValue(null)
-    await expect(updateUserRole('u1', 'superadmin')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
+    await expect(updateUserRole('admin-1', 'u1', 'superadmin')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
     expect(userUpdate).not.toHaveBeenCalled()
   })
 
   it('throws 404 for an unknown user', async () => {
     roleFindFirst.mockResolvedValue({ id: 2, name: 'creator' } as never)
     userFindUnique.mockResolvedValue(null)
-    await expect(updateUserRole('nope', 'creator')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
+    await expect(updateUserRole('admin-1', 'nope', 'creator')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
+  })
+
+  it('refuses an admin demoting themselves', async () => {
+    roleFindFirst.mockResolvedValue({ id: 2, name: 'creator' } as never)
+    userFindUnique.mockResolvedValue({ ...userRow, id: 'admin-1', role: { id: 3, name: 'admin' } } as never)
+
+    await expect(updateUserRole('admin-1', 'admin-1', 'creator')).rejects.toMatchObject({
+      status: 403,
+      code: 'FORBIDDEN',
+    })
+    expect(userUpdate).not.toHaveBeenCalled()
+  })
+
+  it('refuses to demote the last remaining admin', async () => {
+    roleFindFirst.mockResolvedValue({ id: 2, name: 'creator' } as never)
+    userFindUnique.mockResolvedValue({ ...userRow, id: 'u2', role: { id: 3, name: 'admin' } } as never)
+    userCount.mockResolvedValue(1)
+
+    await expect(updateUserRole('admin-1', 'u2', 'creator')).rejects.toMatchObject({
+      status: 403,
+      code: 'FORBIDDEN',
+    })
+    expect(userCount).toHaveBeenCalledWith({ where: { role: { name: 'admin' }, deletedAt: null } })
+    expect(userUpdate).not.toHaveBeenCalled()
   })
 
   it('updates the user role', async () => {
@@ -270,7 +294,7 @@ describe('updateUserRole', () => {
     userFindUnique.mockResolvedValue(userRow as never)
     userUpdate.mockResolvedValue({ ...userRow, role: { id: 2, name: 'creator' } } as never)
 
-    await expect(updateUserRole('u1', 'creator')).resolves.toEqual({ id: 'u1', role: 'creator' })
+    await expect(updateUserRole('admin-1', 'u1', 'creator')).resolves.toEqual({ id: 'u1', role: 'creator' })
     expect(userUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'u1' }, data: { roleId: 2 } }),
     )
@@ -346,7 +370,7 @@ describe('getAdminStats', () => {
       bannedUsers: 3,
       totalAssets: 15,
       // Archived is absent from the groupBy result and must default to 0.
-      byStatus: { Draft: 4, Published: 10, Archived: 0 },
+      byStatus: { Draft: 4, Published: 10, Archived: 0, Suspended: 1 },
       totalOrders: 40,
       confirmedRevenue: 123.45,
     })
