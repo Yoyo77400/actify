@@ -1,16 +1,25 @@
 name: Deploy Actify
 
+# Chaîné sur la CI (workflow_run) : ne se déclenche qu'à la fin d'un run du
+# workflow "CI" sur main — plus jamais en parallèle d'une CI qui pourrait
+# échouer. Le job filtre ensuite sur conclusion == success.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
 
-# Un seul déploiement à la fois ; les pushes suivants attendent la fin du courant.
+# Un seul déploiement à la fois ; les runs suivants attendent la fin du courant.
 concurrency:
   group: deploy-actify
   cancel-in-progress: false
 
 jobs:
   deploy:
+    # `event == 'push'` est obligatoire : une PR du fork upstream avec une head
+    # branch nommée "main" produirait aussi un run CI retenu par le filtre
+    # branches ci-dessus — seul un vrai push sur main doit déployer.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Deploy sur le VPS

@@ -10,6 +10,11 @@ services:
     image: actify_frontend:prod
     container_name: actify_frontend
     restart: unless-stopped
+    environment:
+      # Umami analytics (Nuxt public runtimeConfig, read at runtime by Nitro).
+      # Empty = disabled: the front never injects the tracker script.
+      NUXT_PUBLIC_UMAMI_HOST: ${NUXT_PUBLIC_UMAMI_HOST:-}
+      NUXT_PUBLIC_UMAMI_WEBSITE_ID: ${NUXT_PUBLIC_UMAMI_WEBSITE_ID:-}
     networks:
       - actify-prod
       - web
@@ -31,7 +36,9 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
-      # Defaults to XRPL Testnet inside the code; override for mainnet.
+      # Defaults to XRPL Testnet inside the code. The project is testnet-only
+      # (per the terms of service); the passthrough only exists to point at a
+      # local rippled, never mainnet.
       XRPL_RPC_URL: ${XRPL_RPC_URL:-https://s.altnet.rippletest.net:51234/}
       # Wallet auto-promoted to admin on login (empty = disabled).
       ADMIN_WALLET_ADDRESS: ${ADMIN_WALLET_ADDRESS:-}
@@ -90,12 +97,61 @@ services:
       retries: 5
       start_period: 20s
 
+  # ── Umami (privacy-friendly analytics) ─────────────────────────────────────
+  # Self-hosted audience measurement — no cookies, no cross-site tracking, no
+  # data leaves the VPS. On "web" so the reverse-proxy can expose it on its own
+  # subdomain (same logic as frontend), on "umami-internal" to reach its
+  # database. Deliberately NOT on actify-prod: analytics never touches the
+  # app's internal services.
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: actify_umami
+    restart: unless-stopped
+    environment:
+      # :? = fail fast at compose time when the variable is missing from the
+      # VPS .env, instead of an obscure crash-loop / weak silent fallback.
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:?UMAMI_DB_PASSWORD is required (see .env.example)}@umami_db:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET:?UMAMI_APP_SECRET is required (see .env.example)}
+    networks:
+      - umami-internal
+      - web
+    depends_on:
+      umami_db:
+        condition: service_healthy
+
+  # ── Umami database ────────────────────────────────────────────────────────
+  # Dedicated PostgreSQL, never shared with the app db (separate blast radius,
+  # independent lifecycle). Strictly internal — no port exposed to the host.
+  umami_db:
+    image: postgres:16-alpine
+    container_name: actify_umami_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:?UMAMI_DB_PASSWORD is required (see .env.example)}
+      POSTGRES_DB:       umami
+    volumes:
+      - umami_db_data:/var/lib/postgresql/data
+    networks:
+      - umami-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   postgres_data:
   actify_uploads:
+  umami_db_data:
 
 networks:
   actify-prod:
+    internal: true
+  # Umami ↔ its database only — isolated from the app's actify-prod perimeter.
+  umami-internal:
     internal: true
   web:
     external: true

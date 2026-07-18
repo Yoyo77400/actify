@@ -1,72 +1,61 @@
 <template>
+  <!-- Read-only row: the API exposes no admin action on orders (no cancel/refund/delete). -->
   <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-line last:border-b-0">
-    <div class="flex items-center gap-3 min-w-0">
-      <img class="w-9 h-9 rounded-[8px] object-cover shrink-0" :src="sale.assetImage" :alt="sale.assetName" >
-      <div class="min-w-0">
-        <p class="m-0 text-sm font-medium truncate">{{ sale.assetName }}</p>
-        <p class="m-0 text-xs text-muted-2 mt-0.5">{{ sale.seller }} → {{ sale.buyer }}</p>
-      </div>
+    <div class="min-w-0">
+      <NuxtLink
+        :to="`/assets/${order.listing.slug ?? order.listing.id}`"
+        class="m-0 text-sm font-medium truncate block text-foreground no-underline hover:underline"
+      >
+        {{ order.listing.title }}
+      </NuxtLink>
+      <p class="m-0 text-xs text-muted-2 mt-0.5">
+        acheté par {{ buyerName }} · {{ purchasedLabel }}
+      </p>
     </div>
 
     <div class="flex items-center gap-3 shrink-0">
-      <span class="text-sm font-semibold whitespace-nowrap">{{ sale.price }} {{ sale.currency }}</span>
-      <span class="pill-badge text-xs" :class="statusBadge">{{ sale.status }}</span>
-      <span class="text-xs text-muted font-mono hidden lg:block">{{ sale.txHash }}</span>
-
-      <div class="relative">
-        <button
-          class="ghost-btn w-8 h-8 !p-0 flex items-center justify-center"
-          type="button"
-          @click="menuOpen = !menuOpen"
-        >
-          <Icon name="ph:dots-three-vertical" />
-        </button>
-        <div v-if="menuOpen" class="admin-dropdown" @mouseleave="menuOpen = false">
-          <button
-            v-if="sale.status === 'pending' || sale.status === 'disputed'"
-            class="admin-dropdown-item"
-            type="button"
-            @click="emit('cancel', sale.id); menuOpen = false"
-          >
-            Cancel sale
-          </button>
-          <button
-            v-if="sale.status === 'completed' || sale.status === 'disputed'"
-            class="admin-dropdown-item text-warning"
-            type="button"
-            @click="emit('refund', sale.id); menuOpen = false"
-          >
-            Refund
-          </button>
-          <button
-            class="admin-dropdown-item text-danger"
-            type="button"
-            @click="emit('delete', sale.id); menuOpen = false"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
+      <span class="text-sm font-semibold whitespace-nowrap">{{ order.amountPaid }}</span>
+      <span class="pill-badge text-xs" :class="statusBadge">{{ statusLabel }}</span>
+      <span v-if="order.txHash" class="text-xs text-muted font-mono hidden lg:block" :title="order.txHash">
+        {{ shortTxHash }}
+      </span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { AdminSale } from '~/types/admin'
+import type { AdminOrder, AdminOrderStatus } from '~/types/admin'
 
-const props = defineProps<{ sale: AdminSale }>()
-const emit = defineEmits<{
-  cancel: [id: string]
-  refund: [id: string]
-  delete: [id: string]
-}>()
+const props = defineProps<{ order: AdminOrder }>()
 
-const menuOpen = ref(false)
+const STATUS_LABELS: Record<AdminOrderStatus, string> = {
+  Pending: 'En attente',
+  Confirmed: 'Confirmée',
+  Cancelled: 'Annulée',
+}
+
+const statusLabel = computed(() => STATUS_LABELS[props.order.status] ?? props.order.status)
+
+const buyerName = computed(() => {
+  const { displayName, username, id } = props.order.buyer
+  return displayName || username || `${id.slice(0, 6)}…`
+})
+
+// Pinned timezone: these rows are SSR-rendered and the server may not run in
+// Europe/Paris — a floating local timezone would break hydration.
+const purchasedLabel = computed(() =>
+  new Date(props.order.purchasedAt).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' }),
+)
+
+const shortTxHash = computed(() => {
+  const hash = props.order.txHash
+  if (!hash) return ''
+  return hash.length > 18 ? `${hash.slice(0, 10)}…${hash.slice(-6)}` : hash
+})
 
 const statusBadge = computed(() => ({
-  'bg-success/12 text-success border-success/20': props.sale.status === 'completed',
-  'bg-warning/12 text-warning border-warning/20': props.sale.status === 'pending',
-  'bg-danger/12 text-danger border-danger/20': props.sale.status === 'disputed',
-  'bg-muted/12 text-muted border-muted/20': props.sale.status === 'cancelled' || props.sale.status === 'refunded',
+  'bg-success/12 text-success border-success/20': props.order.status === 'Confirmed',
+  'bg-warning/12 text-warning border-warning/20': props.order.status === 'Pending',
+  'bg-muted/12 text-muted border-muted/20': props.order.status === 'Cancelled',
 }))
 </script>

@@ -100,7 +100,6 @@
           <span class="w-1.5 h-1.5 rounded-full bg-green-400" style="box-shadow: 0 0 6px rgba(74,222,128,0.4);" />
           <span>Solana Status: Operational</span>
         </div>
-        <button type="button" class="underline underline-offset-2 text-white/30 hover:text-[#8b7aef] transition-colors duration-300 cursor-pointer" @click="leave('/security')">Security</button>
       </div>
     </footer>
   </div>

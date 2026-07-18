@@ -9,7 +9,6 @@ const ADMIN_ROLE = 'admin'
 // placeholder in tx_hash until a real payment confirms them.
 const PENDING_TX_PREFIX = 'pending:'
 const ASSET_STATUSES = ['Draft', 'Published', 'Archived', 'Suspended']
-const STATS_ASSET_STATUSES = ['Draft', 'Published', 'Archived']
 
 const SELLER_SELECT = { select: { id: true, username: true, displayName: true } } as const
 
@@ -188,7 +187,7 @@ export async function setUserBanStatus(userId: string, banned: boolean) {
   return { id: updated.id, isBanned: updated.isBanned }
 }
 
-export async function updateUserRole(userId: string, roleName: string) {
+export async function updateUserRole(actorId: string, userId: string, roleName: string) {
   const name = (roleName ?? '').trim()
   if (name.length === 0) {
     throw new AppError(400, 'VALIDATION_ERROR', 'role est requis')
@@ -199,9 +198,23 @@ export async function updateUserRole(userId: string, roleName: string) {
     throw new AppError(404, 'NOT_FOUND', 'Rôle introuvable')
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } })
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: { role: true } })
   if (!user) {
     throw new AppError(404, 'NOT_FOUND', 'Utilisateur introuvable')
+  }
+
+  // Lockout guard: only demotions are gated (granting admin is always fine).
+  // An admin can neither demote himself nor demote the last active admin.
+  if (name !== ADMIN_ROLE) {
+    if (userId === actorId) {
+      throw new AppError(403, 'FORBIDDEN', 'Impossible de retirer son propre rôle administrateur')
+    }
+    if (user.role.name === ADMIN_ROLE) {
+      const adminCount = await prisma.user.count({ where: { role: { name: ADMIN_ROLE }, deletedAt: null } })
+      if (adminCount === 1) {
+        throw new AppError(403, 'FORBIDDEN', 'Impossible de rétrograder le dernier administrateur')
+      }
+    }
   }
 
   const updated = await prisma.user.update({
@@ -257,7 +270,7 @@ export async function getAdminStats() {
 
   const countsByStatus = new Map(assetsByStatus.map((row) => [row.status, row._count._all]))
   const byStatus: Record<string, number> = {}
-  for (const status of STATS_ASSET_STATUSES) {
+  for (const status of ASSET_STATUSES) {
     byStatus[status] = countsByStatus.get(status) ?? 0
   }
 

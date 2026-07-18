@@ -35,10 +35,10 @@
         to="/"
         class="sidebar-link"
         :class="expanded ? 'px-2' : 'justify-center'"
-        title="Back to site"
+        title="Retour au site"
       >
         <Icon name="ph:arrow-left" class="text-xl shrink-0" />
-        <span v-show="expanded" class="text-sm whitespace-nowrap">Back to site</span>
+        <span v-show="expanded" class="text-sm whitespace-nowrap">Retour au site</span>
       </NuxtLink>
     </nav>
   </aside>
@@ -48,11 +48,10 @@
 const expanded = ref(false)
 
 const items = [
-  { label: 'Dashboard', to: '/admin', icon: 'ph:squares-four' },
-  { label: 'Users', to: '/admin/users', icon: 'ph:users' },
-  { label: 'Sales', to: '/admin/sales', icon: 'ph:receipt' },
+  { label: 'Tableau de bord', to: '/admin', icon: 'ph:squares-four' },
+  { label: 'Utilisateurs', to: '/admin/users', icon: 'ph:users' },
+  { label: 'Ventes', to: '/admin/sales', icon: 'ph:receipt' },
   { label: 'Assets', to: '/admin/assets', icon: 'ph:cube' },
-  { label: 'Reports', to: '/admin/reports', icon: 'ph:flag' },
 ]
 </script>
 

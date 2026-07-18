@@ -1,10 +1,15 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  // pg_trgm backs the GIN trigram indexes on listings.title/description:
+  // a B-tree can only serve left-anchored patterns, while the search service
+  // matches ILIKE '%q%' (contains). See docs/query-optimization.md.
+  extensions = [pg_trgm]
 }
 
 model Role {
@@ -52,6 +57,10 @@ model Wallet {
 
   user User @relation(fields: [userId], references: [id])
 
+  // Seller's primary wallet is resolved on every order creation
+  // (orders.service.getSellerPrimaryWalletOrThrow) and wallets are listed per
+  // user; the unique(address) index cannot serve user_id lookups.
+  @@index([userId])
   @@map("wallets")
 }
 
@@ -131,6 +140,8 @@ model Nft {
   currentOwner User     @relation("NftOwner", fields: [currentOwnerId], references: [id])
   resales      Resale[]
 
+  // "NFTs owned by a user" lookup (users.service.exportMyData).
+  @@index([currentOwnerId])
   @@map("nfts")
 }
 
@@ -168,6 +179,16 @@ model Listing {
   favorites         Favorite[]
   nft               Nft?
 
+  // Creator dashboard + public profile: a seller's listings ordered by
+  // recency (assets.service.listMyListings, users.service.listUserAssets).
+  @@index([sellerId, createdAt])
+  // Published catalogue with the default createdAt sort
+  // (assets.service.listAssets, admin.service.listAllAssets).
+  @@index([status, createdAt])
+  // Trigram indexes for ILIKE '%q%' search on the catalogue
+  // (search.service.searchAssets, assets.service.buildWhere).
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("listings")
 }
 
@@ -179,6 +200,10 @@ model ListingCategory {
   category Category @relation(fields: [categoryId], references: [id])
 
   @@id([listingId, categoryId])
+  // The composite PK only serves listing_id-prefixed lookups; browsing a
+  // category (categories.service.findCategoryListings) filters by category_id
+  // alone.
+  @@index([categoryId])
   @@map("listing_categories")
 }
 
@@ -190,6 +215,9 @@ model ListingTag {
   tag     Tag     @relation(fields: [tagId], references: [id])
 
   @@id([listingId, tagId])
+  // Same asymmetry as listing_categories: the tag filter on the catalogue
+  // (assets.service.buildWhere) resolves listings from tag_id alone.
+  @@index([tagId])
   @@map("listing_tags")
 }
 
@@ -202,6 +230,11 @@ model Download {
   user    User    @relation(fields: [userId], references: [id])
   listing Listing @relation(fields: [listingId], references: [id])
 
+  // Download history, newest first (downloads.service.listMyDownloads).
+  @@index([userId, downloadedAt])
+  // Distinct-downloaders cap check and per-asset stats
+  // (downloads.service.requestDownload, creator.service.getCreatorAssetStats).
+  @@index([listingId])
   @@map("downloads")
 }
 
@@ -223,6 +256,11 @@ model Purchase {
   buyer   User    @relation(fields: [buyerId], references: [id])
   listing Listing @relation(fields: [listingId], references: [id])
 
+  // Buyer's order history, newest first (orders.service.listOrders).
+  @@index([buyerId, purchasedAt])
+  // Confirmed-sales lookups per listing: stock cap, entitlement, revenue
+  // aggregates (orders/downloads/reviews/creator/stats services).
+  @@index([listingId, status])
   @@map("purchases")
 }
 
@@ -237,6 +275,11 @@ model Review {
   listing  Listing @relation(fields: [listingId], references: [id])
   reviewer User    @relation(fields: [reviewerId], references: [id])
 
+  // Reviews of an asset with the default createdAt sort
+  // (reviews.service.listAssetReviews) + rating aggregates per listing.
+  @@index([listingId, createdAt])
+  // Reviews written by a user (users.service.listUserReviews).
+  @@index([reviewerId])
   @@map("reviews")
 }
 
@@ -249,6 +292,9 @@ model Favorite {
   listing Listing @relation(fields: [listingId], references: [id])
 
   @@id([userId, listingId])
+  // The composite PK covers user_id lookups (listMyFavorites) but not the
+  // per-asset favorites count (creator.service.getCreatorAssetStats).
+  @@index([listingId])
   @@map("favorites")
 }
 

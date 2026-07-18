@@ -1,86 +1,70 @@
 <template>
   <div class="flex flex-col gap-7">
     <div>
-      <h1 class="ethnocentric m-0 text-2xl">Dashboard</h1>
-      <p class="mt-1 mb-0 text-muted text-sm">Overview of platform activity</p>
+      <h1 class="ethnocentric m-0 text-2xl">Tableau de bord</h1>
+      <p class="mt-1 mb-0 text-muted text-sm">Vue d'ensemble de l'activité de la plateforme</p>
     </div>
 
-    <div class="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
-      <AdminStatCard label="Total users" :value="stats.totalUsers.toLocaleString()" :change="stats.userGrowth" />
-      <AdminStatCard label="Active users" :value="stats.activeUsers.toLocaleString()" />
-      <AdminStatCard label="Total sales" :value="stats.totalSales.toLocaleString()" :change="stats.salesGrowth" />
-      <AdminStatCard label="Total volume" :value="stats.totalVolume" :change="stats.volumeGrowth" />
-      <AdminStatCard label="Pending reports" :value="stats.pendingReports" />
-      <AdminStatCard label="Flagged assets" :value="stats.flaggedAssets" />
+    <div v-if="loadError" class="surface p-10 flex flex-col items-center gap-3 text-center">
+      <Icon name="ph:warning-circle" class="text-3xl text-danger" />
+      <p class="m-0 text-muted text-sm" role="alert">{{ loadError }}</p>
+      <button type="button" class="primary-btn mt-2" @click="refresh()">Réessayer</button>
     </div>
 
-    <div class="grid grid-cols-[1fr_1fr] max-lg:grid-cols-1 gap-[18px]">
-      <section>
-        <h2 class="ethnocentric m-0 text-lg mb-3">Recent sales</h2>
-        <div class="surface overflow-hidden">
-          <AdminSaleRow
-            v-for="sale in payload.recentSales"
-            :key="sale.id"
-            :sale="sale"
-            @cancel="onCancelSale"
-            @refund="onRefundSale"
-            @delete="onDeleteSale"
-          />
-        </div>
-      </section>
+    <template v-else-if="stats">
+      <div class="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
+        <AdminStatCard label="Utilisateurs" :value="stats.totalUsers.toLocaleString('fr-FR')" />
+        <AdminStatCard label="Utilisateurs bannis" :value="stats.bannedUsers.toLocaleString('fr-FR')" />
+        <AdminStatCard label="Assets" :value="stats.totalAssets.toLocaleString('fr-FR')" />
+        <AdminStatCard label="Commandes" :value="stats.totalOrders.toLocaleString('fr-FR')" />
+        <AdminStatCard label="Revenu confirmé" :value="stats.confirmedRevenue.toLocaleString('fr-FR')" />
+      </div>
 
       <section>
-        <h2 class="ethnocentric m-0 text-lg mb-3">Open reports</h2>
-        <div class="surface overflow-hidden">
-          <AdminReportRow
-            v-for="report in payload.recentReports"
-            :key="report.id"
-            :report="report"
-            @resolve="onResolveReport"
-            @dismiss="onDismissReport"
-          />
-          <AdminEmptyState
-            v-if="!payload.recentReports.length"
-            message="No open reports"
-            icon="ph:check-circle"
-          />
+        <h2 class="ethnocentric m-0 text-lg mb-3">Assets par statut</h2>
+        <div class="grid grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
+          <AdminStatCard label="Publiés" :value="stats.byStatus.Published ?? 0" />
+          <AdminStatCard label="Brouillons" :value="stats.byStatus.Draft ?? 0" />
+          <AdminStatCard label="Suspendus" :value="stats.byStatus.Suspended ?? 0" />
+          <AdminStatCard label="Archivés" :value="stats.byStatus.Archived ?? 0" />
         </div>
       </section>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  adminCancelSale,
-  adminRefundSale,
-  adminDeleteSale,
-  adminResolveReport,
-  adminDismissReport
-} from '~/composables/useAdminApi'
+import type { AdminStats } from '~/types/admin'
+
+type StatsResult =
+  | { ok: true; stats: AdminStats }
+  | { ok: false; message: string }
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: 'Dashboard' })
+useHead({ title: 'Tableau de bord' })
 
-const { data } = await useAdminDashboard()
-const payload = computed(() => data.value)
-const stats = computed(() => payload.value.stats)
+const adminApi = useAdminApi()
 
-const store = useAdminStore()
+// Errors are normalized inside the handler so `toApiError` sees the raw
+// FetchError (Nuxt would otherwise wrap it and break `instanceof`).
+const { data, refresh } = await useAsyncData<StatsResult>('admin-stats', async () => {
+  try {
+    return { ok: true, stats: await adminApi.stats() }
+  } catch (err) {
+    return {
+      ok: false,
+      message: toApiError(err)?.message
+        ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'Impossible de charger les statistiques.'),
+    }
+  }
+})
 
-function onCancelSale(id: string) {
-  store.requestConfirm('Cancel this sale? The transaction will be voided.', () => adminCancelSale(id))
-}
-function onRefundSale(id: string) {
-  store.requestConfirm('Refund this sale? Funds will be returned to the buyer.', () => adminRefundSale(id))
-}
-function onDeleteSale(id: string) {
-  store.requestConfirm('Permanently delete this sale record? This cannot be undone.', () => adminDeleteSale(id))
-}
-function onResolveReport(id: string) {
-  store.requestConfirm('Mark this report as resolved?', () => adminResolveReport(id))
-}
-function onDismissReport(id: string) {
-  store.requestConfirm('Dismiss this report? No action will be taken.', () => adminDismissReport(id))
-}
+const stats = computed<AdminStats | null>(() => {
+  const d = data.value
+  return d?.ok ? d.stats : null
+})
+const loadError = computed<string | null>(() => {
+  const d = data.value
+  return d && !d.ok ? d.message : null
+})
 </script>
