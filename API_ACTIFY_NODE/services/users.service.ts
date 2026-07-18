@@ -214,6 +214,23 @@ export async function listUserAssets(username: string, pagination: Pagination) {
       orderBy: { createdAt: 'desc' },
       skip: pagination.skip,
       take: pagination.limit,
+      // Public endpoint: whitelist the exposed columns. fileIpfsCid is the
+      // storage key of the paid file — leaking it would let anyone stream the
+      // file through GET /files/:key and bypass the paid download flow.
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        shortDescription: true,
+        description: true,
+        thumbnailCid: true,
+        isFree: true,
+        price: true,
+        currency: true,
+        viewsCount: true,
+        salesCount: true,
+        createdAt: true,
+      },
     }),
     prisma.listing.count({ where }),
   ])

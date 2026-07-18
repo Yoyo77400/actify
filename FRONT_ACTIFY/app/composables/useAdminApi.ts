@@ -1,124 +1,115 @@
-import { computed } from 'vue'
-import {
-  dashboardMock,
-  usersMock,
-  salesMock,
-  assetsMock,
-  reportsMock
-} from '~/composables/useAdminMock'
+import { FetchError } from 'ofetch'
 import type {
-  AdminDashboardPayload,
-  AdminUsersPayload,
-  AdminSalesPayload,
-  AdminAssetsPayload,
-  AdminReportsPayload
+  AdminAsset,
+  AdminAssetStatus,
+  AdminOrder,
+  AdminStats,
+  AdminUser,
+  AdminUserDetail,
+  PageMeta,
 } from '~/types/admin'
 
-const API_BASE = '/api/admin'
+const REQUEST_TIMEOUT_MS = 15_000
 
-function isApiReady(): boolean {
-  // flip to true once the backend exists
-  return false
+// Query params supported by the admin list endpoints (see admin.controller.ts).
+export interface AdminAssetListParams {
+  status?: AdminAssetStatus
+  sellerId?: string
+  page?: number
+  limit?: number
 }
 
-async function adminFetch<T>(path: string, fallback: T) {
-  if (!isApiReady()) {
-    return {
-      data: computed(() => fallback),
-      error: computed(() => null),
-      source: computed(() => 'mock' as const)
+export interface AdminUserListParams {
+  q?: string
+  banned?: boolean
+  role?: string
+  page?: number
+  limit?: number
+}
+
+export interface AdminOrderListParams {
+  status?: string
+  page?: number
+  limit?: number
+}
+
+export interface Paginated<T> {
+  items: T[]
+  meta: PageMeta
+}
+
+interface ListEnvelope<T> {
+  success: boolean
+  data: T[]
+  meta: PageMeta
+}
+
+function toQuery(params: object): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value))
     }
   }
+  const qs = search.toString()
+  return qs ? `?${qs}` : ''
+}
 
-  const { data, error } = await useFetch<T>(`${API_BASE}/${path}`)
+export function useAdminApi() {
+  const api = useApi()
+  const config = useRuntimeConfig()
+  const store = useAuthStore()
+
+  // useApi().get unwraps the envelope and drops `meta`, which the admin tables
+  // need for real pagination. This raw GET keeps the envelope; an expiry 401
+  // goes through the same single-flight refresh as useApi, then replays once.
+  async function listWithMeta<T>(path: string): Promise<Paginated<T>> {
+    const call = () =>
+      $fetch<ListEnvelope<T>>(path, {
+        baseURL: config.public.apiBase,
+        headers: store.accessToken ? { Authorization: `Bearer ${store.accessToken}` } : {},
+        timeout: REQUEST_TIMEOUT_MS,
+      })
+
+    let res: ListEnvelope<T>
+    try {
+      res = await call()
+    } catch (err) {
+      const expired =
+        err instanceof FetchError
+        && err.statusCode === 401
+        && toApiError(err)?.code === 'AUTH_REQUIRED'
+        && !!store.refreshToken
+      if (!expired) throw err
+      try {
+        await api.refreshSession()
+      } catch {
+        throw err
+      }
+      res = await call()
+    }
+    return { items: res.data, meta: res.meta }
+  }
 
   return {
-    data: computed(() => (error.value || !data.value ? fallback : data.value)),
-    error,
-    source: computed(() => (error.value ? 'mock' : 'api'))
+    stats: () => api.get<AdminStats>('/admin/stats'),
+
+    listAssets: (params: AdminAssetListParams = {}) =>
+      listWithMeta<AdminAsset>(`/admin/assets${toQuery(params)}`),
+    updateAssetStatus: (id: string, status: AdminAssetStatus) =>
+      api.put<{ id: string; status: AdminAssetStatus }>(`/admin/assets/${id}/status`, { status }),
+    removeAsset: (id: string) =>
+      api.del<{ id: string; status: AdminAssetStatus; deletedAt: string }>(`/admin/assets/${id}`),
+
+    listUsers: (params: AdminUserListParams = {}) =>
+      listWithMeta<AdminUser>(`/admin/users${toQuery(params)}`),
+    getUser: (id: string) => api.get<AdminUserDetail>(`/admin/users/${id}`),
+    banUser: (id: string) => api.post<{ id: string; isBanned: boolean }>(`/admin/users/${id}/ban`),
+    unbanUser: (id: string) => api.post<{ id: string; isBanned: boolean }>(`/admin/users/${id}/unban`),
+    updateUserRole: (id: string, role: string) =>
+      api.put<{ id: string; role: string }>(`/admin/users/${id}/role`, { role }),
+
+    listOrders: (params: AdminOrderListParams = {}) =>
+      listWithMeta<AdminOrder>(`/admin/orders${toQuery(params)}`),
   }
-}
-
-export function useAdminDashboard() {
-  return adminFetch<AdminDashboardPayload>('dashboard', dashboardMock)
-}
-
-export function useAdminUsers() {
-  return adminFetch<AdminUsersPayload>('users', usersMock)
-}
-
-export function useAdminSales() {
-  return adminFetch<AdminSalesPayload>('sales', salesMock)
-}
-
-export function useAdminAssets() {
-  return adminFetch<AdminAssetsPayload>('assets', assetsMock)
-}
-
-export function useAdminReports() {
-  return adminFetch<AdminReportsPayload>('reports', reportsMock)
-}
-
-// ── Write operations (stubs) ──
-// These will POST/PATCH/DELETE once the API is wired up.
-// For now they mutate the local mock data and return a resolved promise.
-
-export async function adminBanUser(_userId: string): Promise<boolean> {
-  // TODO: POST /api/admin/users/:id/ban
-  return true
-}
-
-export async function adminSuspendUser(_userId: string): Promise<boolean> {
-  // TODO: POST /api/admin/users/:id/suspend
-  return true
-}
-
-export async function adminReactivateUser(_userId: string): Promise<boolean> {
-  // TODO: POST /api/admin/users/:id/reactivate
-  return true
-}
-
-export async function adminSetUserRole(_userId: string, _role: string): Promise<boolean> {
-  // TODO: PATCH /api/admin/users/:id/role
-  return true
-}
-
-export async function adminCancelSale(_saleId: string): Promise<boolean> {
-  // TODO: POST /api/admin/sales/:id/cancel
-  return true
-}
-
-export async function adminRefundSale(_saleId: string): Promise<boolean> {
-  // TODO: POST /api/admin/sales/:id/refund
-  return true
-}
-
-export async function adminDeleteSale(_saleId: string): Promise<boolean> {
-  // TODO: DELETE /api/admin/sales/:id
-  return true
-}
-
-export async function adminFlagAsset(_assetId: string): Promise<boolean> {
-  // TODO: POST /api/admin/assets/:id/flag
-  return true
-}
-
-export async function adminRemoveAsset(_assetId: string): Promise<boolean> {
-  // TODO: POST /api/admin/assets/:id/remove
-  return true
-}
-
-export async function adminRestoreAsset(_assetId: string): Promise<boolean> {
-  // TODO: POST /api/admin/assets/:id/restore
-  return true
-}
-
-export async function adminResolveReport(_reportId: string): Promise<boolean> {
-  // TODO: POST /api/admin/reports/:id/resolve
-  return true
-}
-
-export async function adminDismissReport(_reportId: string): Promise<boolean> {
-  // TODO: POST /api/admin/reports/:id/dismiss
-  return true
 }

@@ -1,41 +1,50 @@
 <template>
   <article class="surface overflow-hidden">
-    <NuxtLink :to="`/assets/${item.id}`">
-      <img class="w-full h-[230px] object-cover bg-[#f1f3f7]" :src="item.image" :alt="item.name" >
+    <NuxtLink :to="assetLink">
+      <img
+        class="w-full h-[230px] object-cover bg-panel-3"
+        :src="assetImage(item.thumbnailCid, item.id)"
+        :alt="item.title"
+        loading="lazy"
+      >
     </NuxtLink>
 
     <div class="p-3.5">
-      <h3 class="ethnocentric m-0 text-base">{{ item.name }}</h3>
-      <p class="mt-2 mb-3 text-muted text-[13px] min-h-[40px]">{{ item.description }}</p>
+      <h3 class="ethnocentric m-0 text-base line-clamp-1">{{ item.title }}</h3>
+      <p class="mt-2 mb-3 text-muted text-[13px] min-h-[40px] line-clamp-2">
+        {{ item.shortDescription ?? item.description ?? '' }}
+      </p>
 
       <div class="flex items-center justify-between gap-3">
-        <span
-          class="pill-badge"
-          :class="item.active
-            ? 'text-[#062012] bg-[rgba(42,255,135,0.85)] border-[rgba(42,255,135,0.85)]'
-            : 'text-white bg-[rgba(255,91,106,0.2)] border-[rgba(255,91,106,0.4)]'"
-        >
-          {{ item.statusLabel }}
+        <strong class="text-sm" :class="item.isFree ? 'text-success' : 'text-foreground'">
+          {{ priceLabel }}
+        </strong>
+        <span class="text-muted-2 text-xs inline-flex items-center gap-1">
+          <Icon name="ph:eye" class="text-sm" />
+          {{ item.viewsCount }}
         </span>
-        <strong>{{ item.price }}{{ item.currency }}</strong>
       </div>
 
-      <div class="flex items-center justify-between gap-3 mt-3">
-        <NuxtLink :to="`/assets/${item.id}`" class="secondary-btn inline-flex items-center justify-center w-full">
-          View
-        </NuxtLink>
-        <button class="primary-btn inline-flex items-center justify-center w-full" type="button" :disabled="!item.active">
-          Buy
-        </button>
-      </div>
+      <!-- Purchase happens on the asset detail page (order + XRPL payment flow). -->
+      <NuxtLink :to="assetLink" class="secondary-btn inline-flex items-center justify-center w-full mt-3">
+        Voir
+      </NuxtLink>
     </div>
   </article>
 </template>
 
 <script setup lang="ts">
-import type { ArtistAsset } from '~/types/marketplace'
+import type { PublicListing } from '~/types/marketplace'
 
-defineProps<{
-  item: ArtistAsset
+const props = defineProps<{
+  item: PublicListing
 }>()
+
+const assetLink = computed(() => `/assets/${props.item.slug ?? props.item.id}`)
+
+const priceLabel = computed(() => {
+  if (props.item.isFree) return 'Gratuit'
+  if (!props.item.price) return '—'
+  return props.item.currency ? `${props.item.price} ${props.item.currency}` : props.item.price
+})
 </script>

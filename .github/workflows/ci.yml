@@ -1,0 +1,101 @@
+name: CI
+
+# Intégration continue : valide chaque PR et chaque push sur main/develop.
+# deploy.yml est chaîné sur ce workflow (workflow_run) : le déploiement ne
+# part sur le VPS que si ce run est vert sur un push main.
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+# Un seul run par branche : un nouveau push annule le run devenu obsolète.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Lecture seule : aucune étape n'écrit dans le repo ni ne publie quoi que ce soit.
+permissions:
+  contents: read
+
+jobs:
+  # ── API (Express + Prisma) ─────────────────────────────────────────────────
+  # Typage strict + suite Vitest. Aucune base de données requise : les tests
+  # sont unitaires et vitest.config.ts injecte le JWT_SECRET nécessaire.
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: API_ACTIFY_NODE
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Aucune étape n'utilise git après le checkout : pas de token persisté.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: API_ACTIFY_NODE/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      # Le client Prisma est émis en TS dans generated/ (gitignored) et inclus
+      # dans le tsconfig → il doit exister avant tsc et les tests. `generate`
+      # ne se connecte pas à la base, pas besoin de DATABASE_URL.
+      - name: Générer le client Prisma
+        run: npx prisma generate
+
+      - name: Vérifier le typage
+        run: npx tsc --noEmit
+
+      - name: Lancer les tests
+        run: npm test
+
+  # ── Front (Nuxt) ───────────────────────────────────────────────────────────
+  # `npm ci` déclenche `nuxt prepare` (postinstall) → génère .nuxt/, requis par
+  # le typecheck ET par eslint.config.mjs (qui importe .nuxt/eslint.config.mjs).
+  front:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: FRONT_ACTIFY
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Aucune étape n'utilise git après le checkout : pas de token persisté.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: FRONT_ACTIFY/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Vérifier le typage
+        run: npm run typecheck
+
+      - name: Linter
+        run: npx eslint .
+
+  # ── Images Docker ──────────────────────────────────────────────────────────
+  # Reproduit les builds `target: production` de docker-compose.prod.yml (sans
+  # push) : un Dockerfile cassé fait échouer la CI, donc bloque le déploiement
+  # chaîné (deploy.yml) avant qu'il ne parte sur le VPS.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Aucune étape n'utilise git après le checkout : pas de token persisté.
+          persist-credentials: false
+
+      - name: Build image API
+        run: docker build --target production ./API_ACTIFY_NODE
+
+      - name: Build image front
+        run: docker build --target production ./FRONT_ACTIFY

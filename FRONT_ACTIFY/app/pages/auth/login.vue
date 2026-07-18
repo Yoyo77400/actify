@@ -52,9 +52,9 @@
 
     <footer class="absolute bottom-4 w-full px-6 flex items-center justify-between text-muted text-xs">
       <div class="flex gap-3.5 flex-wrap">
-      <a href="#">Terms of Service</a>
-      <a href="#">Privacy Policy</a>
-      <a href="#">Support</a>
+      <NuxtLink to="/terms">Conditions d'utilisation</NuxtLink>
+      <NuxtLink to="/privacy">Politique de confidentialité</NuxtLink>
+      <a href="mailto:yohan.georgelin@gmail.com">Support</a>
     </div>
     <p>© {{ year }} Actify. All rights reserved.</p>
     </footer>

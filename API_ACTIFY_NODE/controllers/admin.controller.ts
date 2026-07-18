@@ -60,7 +60,7 @@ export async function unbanUser(req: Request, res: Response) {
 
 export async function updateUserRole(req: Request, res: Response) {
   const body = req.body ?? {}
-  const result = await adminService.updateUserRole(String(req.params.id), body.role)
+  const result = await adminService.updateUserRole(req.user!.id, String(req.params.id), body.role)
   sendSuccess(res, result)
 }
 

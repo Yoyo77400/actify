@@ -29,6 +29,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: '/api/v1',
+      // Self-hosted Umami analytics. Empty = disabled (the tracker script is
+      // never injected). Overridden at runtime via NUXT_PUBLIC_UMAMI_HOST /
+      // NUXT_PUBLIC_UMAMI_WEBSITE_ID (see docker-compose.prod.yml).
+      umamiHost: '',
+      umamiWebsiteId: '',
     },
   },
   modules: [
