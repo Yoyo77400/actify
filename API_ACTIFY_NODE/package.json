@@ -23,6 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
     "pg": "^8.18.0",
+    "qrcode": "^1.5.4",
     "ripple-keypairs": "^3.0.0"
   },
   "devDependencies": {
@@ -31,6 +32,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.16.0",
+    "@types/qrcode": "^1.5.6",
     "prisma": "^7.5.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
