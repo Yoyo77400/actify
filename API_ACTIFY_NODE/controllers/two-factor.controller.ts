@@ -13,3 +13,11 @@ export async function confirm(req: Request, res: Response) {
   const result = await twoFactorService.confirmTwoFactor(req.user!.id, code)
   sendSuccess(res, result)
 }
+
+// Second verrou du login — public : le pending token (issu du flux wallet)
+// tient lieu d'identification, pas de requireAuth ici.
+export async function verifyLogin(req: Request, res: Response) {
+  const { pendingToken, code } = req.body ?? {}
+  const result = await twoFactorService.verifyLoginTotp(pendingToken, code)
+  sendSuccess(res, result)
+}

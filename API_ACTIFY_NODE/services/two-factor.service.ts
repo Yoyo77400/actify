@@ -2,6 +2,7 @@ import QRCode from 'qrcode'
 import { prisma } from './prisma'
 import { AppError } from '../utils/http'
 import { generateTotpSecret, buildOtpauthUri, verifyTotp } from '../utils/totp'
+import { signAccessToken, signRefreshToken, verifyToken } from '../utils/jwt'
 
 // Orchestration du 2FA (TOTP) : combine le noyau crypto pur (utils/totp),
 // le stockage (Prisma) et le rendu QR. La vérification au login vit dans le
@@ -52,4 +53,38 @@ export async function confirmTwoFactor(userId: string, code: string) {
 
   await prisma.user.update({ where: { id: userId }, data: { twoFactorEnabled: true } })
   return { enabled: true }
+}
+
+// Second verrou du login : échange le jeton intermédiaire (1er facteur validé)
+// + le code TOTP contre un vrai jeton d'accès portant mfa:true. C'est le seul
+// endroit qui consomme le pending token émis par le flux wallet.
+export async function verifyLoginTotp(pendingToken: string, code: string) {
+  if (!pendingToken || typeof pendingToken !== 'string' || !code || typeof code !== 'string') {
+    throw new AppError(400, 'VALIDATION_ERROR', 'pendingToken et code sont requis')
+  }
+
+  const payload = verifyToken(pendingToken)
+  if (!payload || payload.type !== '2fa' || typeof payload.sub !== 'string') {
+    throw new AppError(401, 'AUTH_REQUIRED', 'Session 2FA invalide ou expirée')
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: payload.sub } })
+  if (!user || user.deletedAt) {
+    throw new AppError(401, 'AUTH_REQUIRED', 'Session 2FA invalide ou expirée')
+  }
+  if (user.isBanned) {
+    throw new AppError(403, 'USER_BANNED', 'Compte banni')
+  }
+  if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+    throw new AppError(400, 'TWO_FACTOR_NOT_ENABLED', '2FA non activée pour ce compte')
+  }
+  if (!verifyTotp(code, user.twoFactorSecret)) {
+    throw new AppError(401, 'TWO_FACTOR_INVALID_CODE', 'Code 2FA invalide ou expiré')
+  }
+
+  return {
+    accessToken: signAccessToken(user.id, { mfa: true }),
+    refreshToken: signRefreshToken(user.id),
+    user: { id: user.id, username: user.username },
+  }
 }

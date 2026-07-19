@@ -2,7 +2,7 @@ import { prisma } from './prisma'
 import { AppError } from '../utils/http'
 import { generateNonce } from '../utils/nonce'
 import { getChainVerifier } from './chains'
-import { signAccessToken, signRefreshToken } from '../utils/jwt'
+import { signAccessToken, signRefreshToken, signPendingTotpToken } from '../utils/jwt'
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000
 const DEFAULT_ROLE_NAME = 'user'
@@ -172,6 +172,17 @@ export async function verifyChallenge(input: VerifyInput, authenticatedUserId: s
   }
 
   const finalUser = await promoteIfAdminWallet(user, input.address)
+
+  // Premier facteur (signature wallet) validé. Si la 2FA est active, on
+  // n'ouvre pas la session : on rend un jeton intermédiaire à échanger sur
+  // /auth/verify-2fa contre un vrai jeton d'accès une fois le code TOTP fourni.
+  if (user.twoFactorEnabled) {
+    return {
+      mode: 'totp_required' as const,
+      requires2FA: true,
+      pendingToken: signPendingTotpToken(finalUser.id),
+    }
+  }
 
   return {
     mode: 'authenticated' as const,

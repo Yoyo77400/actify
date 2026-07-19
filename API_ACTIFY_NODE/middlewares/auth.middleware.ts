@@ -8,7 +8,9 @@ import { extractBearerToken, verifyToken } from '../utils/jwt'
 // using JWT_SECRET is a valid session here.
 async function resolveUser(token: string) {
   const payload = verifyToken(token)
-  if (!payload || payload.type === 'refresh') return null
+  // Seuls les jetons d'accès (sans `type`) ouvrent une session : on rejette le
+  // refresh ET le jeton intermédiaire '2fa', qui ne prouve que le 1er facteur.
+  if (!payload || payload.type) return null
 
   const userId = payload.sub
   if (!userId || typeof userId !== 'string') return null
