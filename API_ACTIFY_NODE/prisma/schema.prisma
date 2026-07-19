@@ -33,6 +33,13 @@ model User {
   createdAt   DateTime  @default(now()) @map("created_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  // 2FA (TOTP). Le secret est écrit à l'enrôlement (/auth/2fa/setup) mais
+  // twoFactorEnabled ne passe à true qu'après confirmation d'un premier code
+  // (/auth/2fa/confirm) — évite de verrouiller un compte sur un secret jamais
+  // synchronisé avec le téléphone.
+  twoFactorSecret  String?  @map("two_factor_secret")
+  twoFactorEnabled Boolean  @default(false) @map("two_factor_enabled")
+
   role      Role       @relation(fields: [roleId], references: [id])
   wallets   Wallet[]
   listings  Listing[]
