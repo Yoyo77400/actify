@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { optionalAuth, requireAuth } from '../middlewares/auth.middleware'
+import { optionalAuth, requireAuth, requireTotp } from '../middlewares/auth.middleware'
 import * as walletsController from '../controllers/wallets.controller'
 
 export const walletsRouter = Router()
@@ -10,5 +10,5 @@ walletsRouter.post('/verify', optionalAuth, walletsController.verify)
 
 walletsRouter.get('/', requireAuth, walletsController.list)
 walletsRouter.put('/:id', requireAuth, walletsController.update)
-// TODO(auth2): gate behind TOTP once 2FA enrollment exists (Bearer token + TOTP per spec).
-walletsRouter.delete('/:id', requireAuth, walletsController.remove)
+// Déliaison d'un wallet (action sensible) : Bearer + 2FA (requireTotp).
+walletsRouter.delete('/:id', requireAuth, requireTotp, walletsController.remove)

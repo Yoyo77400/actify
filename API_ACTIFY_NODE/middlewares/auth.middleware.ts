@@ -17,7 +17,8 @@ async function resolveUser(token: string) {
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user || user.deletedAt) return null
-  return user
+  // mfa remonte du jeton (posé à /auth/verify-2fa) jusqu'à req.user pour requireTotp.
+  return { user, mfa: payload.mfa === true }
 }
 
 export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
@@ -27,19 +28,30 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       throw new AppError(401, 'AUTH_REQUIRED', 'Token manquant ou invalide')
     }
 
-    const user = await resolveUser(token)
-    if (!user) {
+    const resolved = await resolveUser(token)
+    if (!resolved) {
       throw new AppError(401, 'AUTH_REQUIRED', 'Token manquant ou invalide')
     }
-    if (user.isBanned) {
+    if (resolved.user.isBanned) {
       throw new AppError(403, 'USER_BANNED', 'Compte banni')
     }
 
-    req.user = { id: user.id }
+    req.user = { id: resolved.user.id, mfa: resolved.mfa }
     next()
   } catch (err) {
     next(err)
   }
+}
+
+// À placer APRÈS requireAuth. Exige que la session ait franchi le second
+// facteur (mfa:true dans le jeton d'accès, posé par /auth/verify-2fa). Un
+// compte sans 2FA ne peut donc pas atteindre les routes ainsi gardées — c'est
+// voulu : ces actions sensibles imposent la 2FA (spec Auth2).
+export function requireTotp(req: Request, _res: Response, next: NextFunction) {
+  if (!req.user?.mfa) {
+    return next(new AppError(403, 'TWO_FACTOR_REQUIRED', 'Authentification à deux facteurs requise pour cette action'))
+  }
+  next()
 }
 
 // Attaches req.user when a valid access token is present; anonymous callers
@@ -52,14 +64,14 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
   try {
     const token = extractBearerToken(req.header('authorization'))
     if (token) {
-      const user = await resolveUser(token)
-      if (!user) {
+      const resolved = await resolveUser(token)
+      if (!resolved) {
         throw new AppError(401, 'AUTH_REQUIRED', 'Token manquant ou invalide')
       }
-      if (user.isBanned) {
+      if (resolved.user.isBanned) {
         throw new AppError(403, 'USER_BANNED', 'Compte banni')
       }
-      req.user = { id: user.id }
+      req.user = { id: resolved.user.id, mfa: resolved.mfa }
     }
     next()
   } catch (err) {
