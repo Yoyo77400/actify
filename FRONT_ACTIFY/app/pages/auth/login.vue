@@ -19,20 +19,45 @@
         <p class="text-muted text-xs tracking-widest uppercase mt-1">Secure Gateway</p>
       </div>
 
-      <AuthWalletPicker :pending="pending" :step="step" @select="loginWithWallet" />
+      <!-- Étape 1 : wallet -->
+      <template v-if="!totpPending">
+        <AuthWalletPicker :pending="pending" :step="step" @select="loginWithWallet" />
 
-      <p v-if="error" class="text-red-400 text-xs text-center" role="alert">{{ error }}</p>
+        <p v-if="error" class="text-red-400 text-xs text-center" role="alert">{{ error }}</p>
 
-      <div class="w-full flex items-center gap-3">
-        <div class="flex-1 h-px bg-line" />
-        <span class="text-muted text-xs tracking-widest uppercase">Bientôt</span>
-        <div class="flex-1 h-px bg-line" />
-      </div>
+        <div class="w-full flex items-center gap-3">
+          <div class="flex-1 h-px bg-line" />
+          <span class="text-muted text-xs tracking-widest uppercase">Bientôt</span>
+          <div class="flex-1 h-px bg-line" />
+        </div>
 
-      <div class="w-full flex flex-col gap-3">
-        <AuthOAuthButton provider="google" disabled />
-        <AuthOAuthButton provider="github" disabled />
-      </div>
+        <div class="w-full flex flex-col gap-3">
+          <AuthOAuthButton provider="google" disabled />
+          <AuthOAuthButton provider="github" disabled />
+        </div>
+      </template>
+
+      <!-- Étape 2 : code TOTP -->
+      <form v-else class="w-full flex flex-col gap-3" @submit.prevent="onSubmitCode">
+        <div class="flex items-center gap-2 text-foreground text-sm font-medium">
+          <Icon name="ph:shield-check" class="text-lg text-accent" />
+          Vérification en deux étapes
+        </div>
+        <p class="text-muted text-xs">Entrez le code à 6 chiffres de votre application d'authentification.</p>
+        <input
+          v-model="code"
+          class="input text-center tracking-[0.4em] text-lg"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          placeholder="000000"
+          autofocus
+        >
+        <p v-if="error" class="text-red-400 text-xs text-center" role="alert">{{ error }}</p>
+        <button type="submit" class="primary-btn" :disabled="verifying || code.length < 6">
+          {{ verifying ? 'Vérification…' : 'Vérifier le code' }}
+        </button>
+      </form>
 
       <p class="text-muted text-xs text-center leading-relaxed">
         En vous connectant vous acceptez nos
@@ -67,7 +92,12 @@ definePageMeta({ layout: 'auth' })
 useHead({ title: 'Connexion' })
 
 const { isLoggedIn } = useAuth()
-const { pending, step, error, loginWithWallet } = useWalletAuth()
+const { pending, step, error, totpPending, verifying, loginWithWallet, submitTotp } = useWalletAuth()
+
+const code = ref('')
+function onSubmitCode() {
+  submitTotp(code.value.trim())
+}
 
 if (isLoggedIn.value) {
   await navigateTo('/profile')

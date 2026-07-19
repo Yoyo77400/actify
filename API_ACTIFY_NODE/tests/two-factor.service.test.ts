@@ -14,7 +14,8 @@ vi.mock('qrcode', () => ({
 }))
 
 import { prisma } from '../services/prisma'
-import { setupTwoFactor, confirmTwoFactor } from '../services/two-factor.service'
+import { setupTwoFactor, confirmTwoFactor, verifyLoginTotp } from '../services/two-factor.service'
+import { signPendingTotpToken, signAccessToken, signRefreshToken, verifyToken } from '../utils/jwt'
 
 const userFindUnique = vi.mocked(prisma.user.findUnique)
 const userUpdate = vi.mocked(prisma.user.update)
@@ -25,6 +26,7 @@ const baseUser = {
   username: 'alice',
   email: null,
   deletedAt: null,
+  isBanned: false,
   twoFactorSecret: null as string | null,
   twoFactorEnabled: false,
 }
@@ -91,5 +93,42 @@ describe('confirmTwoFactor', () => {
   it('requires a code', async () => {
     userFindUnique.mockResolvedValue({ ...baseUser, twoFactorSecret: generateTotpSecret() } as never)
     await expect(confirmTwoFactor(USER_ID, '')).rejects.toThrow(AppError)
+  })
+})
+
+describe('verifyLoginTotp', () => {
+  it('exchanges a valid pending token + code for tokens carrying mfa:true', async () => {
+    const secret = generateTotpSecret()
+    userFindUnique.mockResolvedValue({ ...baseUser, twoFactorEnabled: true, twoFactorSecret: secret } as never)
+    const pending = signPendingTotpToken(USER_ID)
+    const code = authenticator.generate(secret)
+
+    const result = await verifyLoginTotp(pending, code)
+
+    expect(result.accessToken).toEqual(expect.any(String))
+    expect(result.refreshToken).toEqual(expect.any(String))
+    // The issued access token must record that the second factor was cleared.
+    expect(verifyToken(result.accessToken)?.mfa).toBe(true)
+  })
+
+  it('rejects an incorrect code', async () => {
+    const secret = generateTotpSecret()
+    userFindUnique.mockResolvedValue({ ...baseUser, twoFactorEnabled: true, twoFactorSecret: secret } as never)
+    await expect(verifyLoginTotp(signPendingTotpToken(USER_ID), '000000')).rejects.toThrow(AppError)
+  })
+
+  it('refuses a token that is not a pending-2FA token (e.g. an access token)', async () => {
+    await expect(verifyLoginTotp(signAccessToken(USER_ID), '000000')).rejects.toThrow(AppError)
+    await expect(verifyLoginTotp(signRefreshToken(USER_ID), '000000')).rejects.toThrow(AppError)
+  })
+
+  it('rejects when the account has no 2FA enabled', async () => {
+    userFindUnique.mockResolvedValue({ ...baseUser, twoFactorEnabled: false, twoFactorSecret: null } as never)
+    await expect(verifyLoginTotp(signPendingTotpToken(USER_ID), '000000')).rejects.toThrow(AppError)
+  })
+
+  it('requires both a pending token and a code', async () => {
+    await expect(verifyLoginTotp('', '123456')).rejects.toThrow(AppError)
+    await expect(verifyLoginTotp(signPendingTotpToken(USER_ID), '')).rejects.toThrow(AppError)
   })
 })

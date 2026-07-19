@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { optionalAuth, requireAuth } from '../middlewares/auth.middleware'
+import { optionalAuth, requireAuth, requireTotp } from '../middlewares/auth.middleware'
 import * as assetsController from '../controllers/assets.controller'
 import * as tokenizeController from '../controllers/tokenize.controller'
 import * as uploadsController from '../controllers/uploads.controller'
@@ -20,8 +20,7 @@ assetsRouter.post('/:id/thumbnail', requireAuth, uploadSingleImage('thumbnail'),
 // the asset to be tokenized first.
 assetsRouter.post('/:id/tokenize/intent', requireAuth, tokenizeController.intent)
 assetsRouter.post('/:id/tokenize/confirm', requireAuth, tokenizeController.confirm)
-// TODO(auth2): gate behind TOTP once 2FA enrollment exists (Bearer token + Owner + TOTP per spec).
-assetsRouter.delete('/:id', requireAuth, assetsController.remove)
-// TODO(auth2): gate behind TOTP once 2FA enrollment exists (Bearer token + Owner + TOTP per spec).
-assetsRouter.post('/:id/publish', requireAuth, assetsController.publish)
+// Actions sensibles : 2FA requise.
+assetsRouter.delete('/:id', requireAuth, requireTotp, assetsController.remove)
+assetsRouter.post('/:id/publish', requireAuth, requireTotp, assetsController.publish)
 assetsRouter.post('/:id/unpublish', requireAuth, assetsController.unpublish)
