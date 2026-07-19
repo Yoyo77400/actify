@@ -22,6 +22,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
 export function useWalletAuth() {
   const store = useAuthStore()
   const api = useApi()
+  const { verifyLogin } = useTwoFactor()
   const { fetchMe } = useAuth()
 
   const pending = ref<WalletId | null>(null)
@@ -29,6 +30,10 @@ export function useWalletAuth() {
   // looks frozen.
   const step = ref<string | null>(null)
   const error = ref<string | null>(null)
+  // Set when the wallet signature passed but the account has 2FA on: holds the
+  // pending token to exchange for a real session once the code is entered.
+  const totpPending = ref<string | null>(null)
+  const verifying = ref(false)
 
   async function signChallenge(id: WalletId, opts: { auth: boolean }): Promise<WalletVerifyResult> {
     const adapter = await getWalletAdapter(id)
@@ -94,6 +99,11 @@ export function useWalletAuth() {
    */
   async function loginWithWallet(id: WalletId) {
     await run(id, { auth: false }, async (result) => {
+      // 2FA active : on ne pose pas de session, on bascule sur la saisie du code.
+      if (result.mode === 'totp_required') {
+        totpPending.value = result.pendingToken
+        return
+      }
       if (result.mode !== 'authenticated') {
         error.value = 'Réponse inattendue du serveur, réessaie.'
         return
@@ -108,6 +118,24 @@ export function useWalletAuth() {
         await navigateTo('/profile')
       }
     })
+  }
+
+  // Second verrou : échange le pending token + code TOTP contre un vrai jeton.
+  async function submitTotp(code: string) {
+    if (!totpPending.value) return
+    verifying.value = true
+    error.value = null
+    try {
+      const result = await verifyLogin(totpPending.value, code)
+      store.setTokens(result)
+      totpPending.value = null
+      await fetchMe()
+      await navigateTo('/profile')
+    } catch (err) {
+      error.value = toApiError(err)?.message ?? 'Code invalide ou expiré, réessaie.'
+    } finally {
+      verifying.value = false
+    }
   }
 
   /** Settings flow: caller is authenticated, the signature links one more wallet. */
@@ -130,5 +158,5 @@ export function useWalletAuth() {
     })
   }
 
-  return { pending, step, error, loginWithWallet, linkWallet }
+  return { pending, step, error, totpPending, verifying, loginWithWallet, submitTotp, linkWallet }
 }

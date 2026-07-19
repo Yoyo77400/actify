@@ -29,6 +29,7 @@ function serializeMe(user: {
   bio: string | null
   avatarCid: string | null
   isVerified: boolean
+  twoFactorEnabled: boolean
   createdAt: Date
   role: { name: string }
   wallets: WalletSummary[]
@@ -43,6 +44,8 @@ function serializeMe(user: {
     wallets: user.wallets,
     role: user.role.name,
     isVerified: user.isVerified,
+    // Exposé pour la page Security (statut 2FA) ; jamais le secret lui-même.
+    twoFactorEnabled: user.twoFactorEnabled,
     createdAt: user.createdAt,
   }
 }
