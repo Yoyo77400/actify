@@ -8,8 +8,8 @@ import { extractBearerToken, verifyToken } from '../utils/jwt'
 // using JWT_SECRET is a valid session here.
 async function resolveUser(token: string) {
   const payload = verifyToken(token)
-  // Seuls les jetons d'accès (sans `type`) ouvrent une session : on rejette le
-  // refresh ET le jeton intermédiaire '2fa', qui ne prouve que le 1er facteur.
+  // Seuls les jetons d'accès (sans `type`) ouvrent une session : rejette le
+  // refresh et le pending '2fa', qui ne prouvent que le 1er facteur.
   if (!payload || payload.type) return null
 
   const userId = payload.sub
@@ -17,7 +17,6 @@ async function resolveUser(token: string) {
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user || user.deletedAt) return null
-  // mfa remonte du jeton (posé à /auth/verify-2fa) jusqu'à req.user pour requireTotp.
   return { user, mfa: payload.mfa === true }
 }
 
@@ -43,10 +42,8 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
   }
 }
 
-// À placer APRÈS requireAuth. Exige que la session ait franchi le second
-// facteur (mfa:true dans le jeton d'accès, posé par /auth/verify-2fa). Un
-// compte sans 2FA ne peut donc pas atteindre les routes ainsi gardées — c'est
-// voulu : ces actions sensibles imposent la 2FA (spec Auth2).
+// À placer après requireAuth : exige un jeton mfa:true, sinon 403. Un compte
+// sans 2FA ne peut donc pas atteindre les routes ainsi gardées (voulu).
 export function requireTotp(req: Request, _res: Response, next: NextFunction) {
   if (!req.user?.mfa) {
     return next(new AppError(403, 'TWO_FACTOR_REQUIRED', 'Authentification à deux facteurs requise pour cette action'))

@@ -1,7 +1,6 @@
 export interface AuthenticatedUser {
   id: string
-  // true quand le jeton d'accès a été délivré après validation du 2FA (TOTP).
-  // Lu par requireTotp pour garder les actions sensibles.
+  // true si le jeton a été délivré après validation 2FA (lu par requireTotp).
   mfa: boolean
 }
 

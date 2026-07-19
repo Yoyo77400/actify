@@ -44,7 +44,6 @@ function serializeMe(user: {
     wallets: user.wallets,
     role: user.role.name,
     isVerified: user.isVerified,
-    // Exposé pour la page Security (statut 2FA) ; jamais le secret lui-même.
     twoFactorEnabled: user.twoFactorEnabled,
     createdAt: user.createdAt,
   }

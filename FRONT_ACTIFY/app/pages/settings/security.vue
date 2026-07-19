@@ -24,7 +24,6 @@
       </div>
     </div>
 
-    <!-- 2FA status + actions -->
     <div class="surface p-5 flex flex-col gap-5">
       <div class="flex items-center justify-between gap-4">
         <div class="flex items-center gap-3">
@@ -47,7 +46,7 @@
         </span>
       </div>
 
-      <!-- Enrollment step A: show the QR to scan -->
+      <!-- Enrôlement : QR + confirmation -->
       <div v-if="setupData" class="flex flex-col gap-4 border-t border-white/10 pt-5">
         <p class="text-muted text-xs">1. Scannez ce QR code avec votre application d'authentification :</p>
         <img :src="setupData.qrCode" alt="QR code 2FA" class="w-44 h-44 rounded-lg bg-white p-2 self-center">
@@ -73,7 +72,6 @@
         </div>
       </div>
 
-      <!-- Idle actions -->
       <div v-else class="border-t border-white/10 pt-5">
         <p v-if="success" class="text-emerald-400 text-xs mb-3">La 2FA est désormais activée sur votre compte. ✅</p>
         <p v-if="error" class="text-red-400 text-xs mb-3" role="alert">{{ error }}</p>
@@ -106,7 +104,6 @@ const busy = ref(false)
 const error = ref<string | null>(null)
 const success = ref(false)
 
-// Refresh the status on entry so the badge reflects the server, not a stale cookie.
 onMounted(() => { fetchMe().catch(() => {}) })
 
 async function startEnroll() {

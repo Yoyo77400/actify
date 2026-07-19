@@ -4,10 +4,6 @@ import { AppError } from '../utils/http'
 import { generateTotpSecret, buildOtpauthUri, verifyTotp } from '../utils/totp'
 import { signAccessToken, signRefreshToken, verifyToken } from '../utils/jwt'
 
-// Orchestration du 2FA (TOTP) : combine le noyau crypto pur (utils/totp),
-// le stockage (Prisma) et le rendu QR. La vérification au login vit dans le
-// flux wallet (verify-2fa) et réutilise verifyTotp directement.
-
 async function getUserOrThrow(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user || user.deletedAt) {
@@ -16,9 +12,8 @@ async function getUserOrThrow(userId: string) {
   return user
 }
 
-// Étape A de l'enrôlement : génère un secret, le stocke SANS activer le 2FA
-// (enabled reste false tant qu'un premier code n'a pas été confirmé), et
-// renvoie le QR à scanner + le secret en clair pour la saisie manuelle.
+// Enrôlement A : stocke le secret mais laisse twoFactorEnabled à false tant
+// qu'un premier code n'a pas été confirmé, pour ne pas verrouiller le compte.
 export async function setupTwoFactor(userId: string) {
   const user = await getUserOrThrow(userId)
   if (user.twoFactorEnabled) {
@@ -26,18 +21,14 @@ export async function setupTwoFactor(userId: string) {
   }
 
   const secret = generateTotpSecret()
-  const accountName = user.username ?? user.email ?? user.id
-  const otpauthUri = buildOtpauthUri(accountName, secret)
-
+  const otpauthUri = buildOtpauthUri(user.username ?? user.email ?? user.id, secret)
   await prisma.user.update({ where: { id: userId }, data: { twoFactorSecret: secret } })
 
   const qrCode = await QRCode.toDataURL(otpauthUri)
   return { qrCode, secret, otpauthUri }
 }
 
-// Étape B de l'enrôlement : valide le premier code généré par l'app mobile
-// contre le secret en attente. Prouve la synchronisation avant de verrouiller
-// le compte — sur échec, on n'active rien.
+// Enrôlement B : valide le premier code avant d'activer la 2FA.
 export async function confirmTwoFactor(userId: string, code: string) {
   if (!code || typeof code !== 'string') {
     throw new AppError(400, 'VALIDATION_ERROR', 'code est requis')
@@ -55,9 +46,8 @@ export async function confirmTwoFactor(userId: string, code: string) {
   return { enabled: true }
 }
 
-// Second verrou du login : échange le jeton intermédiaire (1er facteur validé)
-// + le code TOTP contre un vrai jeton d'accès portant mfa:true. C'est le seul
-// endroit qui consomme le pending token émis par le flux wallet.
+// Second verrou du login : échange le pending token (1er facteur validé) + le
+// code TOTP contre un jeton d'accès portant mfa:true.
 export async function verifyLoginTotp(pendingToken: string, code: string) {
   if (!pendingToken || typeof pendingToken !== 'string' || !code || typeof code !== 'string') {
     throw new AppError(400, 'VALIDATION_ERROR', 'pendingToken et code sont requis')

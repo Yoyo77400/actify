@@ -19,7 +19,7 @@
         <p class="text-muted text-xs tracking-widest uppercase mt-1">Secure Gateway</p>
       </div>
 
-      <!-- Étape 1 : choix du wallet. Masquée dès que la 2FA est requise. -->
+      <!-- Étape 1 : wallet -->
       <template v-if="!totpPending">
         <AuthWalletPicker :pending="pending" :step="step" @select="loginWithWallet" />
 
@@ -37,7 +37,7 @@
         </div>
       </template>
 
-      <!-- Étape 2 : second facteur. Le wallet a signé, on attend le code TOTP. -->
+      <!-- Étape 2 : code TOTP -->
       <form v-else class="w-full flex flex-col gap-3" @submit.prevent="onSubmitCode">
         <div class="flex items-center gap-2 text-foreground text-sm font-medium">
           <Icon name="ph:shield-check" class="text-lg text-accent" />

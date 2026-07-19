@@ -7,6 +7,6 @@ export const ordersRouter = Router()
 ordersRouter.post('/', requireAuth, ordersController.create)
 ordersRouter.get('/', requireAuth, ordersController.list)
 ordersRouter.get('/:id', requireAuth, ordersController.getById)
-// Confirmation de paiement (action sensible) : Bearer + 2FA (requireTotp).
+// Action sensible : 2FA requise.
 ordersRouter.post('/:id/confirm', requireAuth, requireTotp, ordersController.confirm)
 ordersRouter.post('/:id/cancel', requireAuth, ordersController.cancel)

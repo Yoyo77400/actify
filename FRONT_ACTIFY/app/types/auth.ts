@@ -56,8 +56,7 @@ export interface WalletVerifyLinked {
   mode: 'linked'
 }
 
-// 1er facteur (signature wallet) validé mais 2FA active : le login n'est pas
-// encore ouvert, il faut échanger pendingToken + code TOTP sur /auth/verify-2fa.
+// 2FA active : login pas encore ouvert, échanger pendingToken + code TOTP.
 export interface WalletVerifyTotpRequired {
   mode: 'totp_required'
   requires2FA: true
@@ -69,14 +68,12 @@ export type WalletVerifyResult =
   | WalletVerifyLinked
   | WalletVerifyTotpRequired
 
-// Réponse de /auth/2fa/setup : QR à scanner + secret pour la saisie manuelle.
 export interface TwoFactorSetup {
   qrCode: string
   secret: string
   otpauthUri: string
 }
 
-// Réponse de /auth/verify-2fa : le vrai jeton, une fois le code validé.
 export interface TwoFactorLoginResult {
   accessToken: string
   refreshToken: string

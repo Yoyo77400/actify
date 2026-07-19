@@ -173,9 +173,8 @@ export async function verifyChallenge(input: VerifyInput, authenticatedUserId: s
 
   const finalUser = await promoteIfAdminWallet(user, input.address)
 
-  // Premier facteur (signature wallet) validé. Si la 2FA est active, on
-  // n'ouvre pas la session : on rend un jeton intermédiaire à échanger sur
-  // /auth/verify-2fa contre un vrai jeton d'accès une fois le code TOTP fourni.
+  // 2FA active : on n'ouvre pas la session, on renvoie un pending token à
+  // échanger sur /auth/verify-2fa une fois le code TOTP fourni.
   if (user.twoFactorEnabled) {
     return {
       mode: 'totp_required' as const,

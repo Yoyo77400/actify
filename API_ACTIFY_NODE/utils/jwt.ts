@@ -9,19 +9,16 @@ const ACCESS_TOKEN_TTL = '15m'
 // Kept short while refresh tokens are stateless (no server-side revocation):
 // a leaked token stays usable for the full TTL. Revisit with the session store.
 const REFRESH_TOKEN_TTL = '7d'
-// Jeton intermédiaire entre la vérification wallet et la saisie du code TOTP :
-// il ne prouve que le premier facteur, d'où une durée de vie très courte.
+// Jeton intermédiaire (1er facteur seul) : durée de vie très courte.
 const PENDING_TOTP_TTL = '5m'
 
-// mfa:true est posé une fois le second facteur (TOTP) validé — requireTotp
-// s'appuie dessus pour garder les routes sensibles. Sans 2FA, pas de claim.
+// mfa:true est posé une fois le 2e facteur validé — requireTotp s'appuie dessus.
 export function signAccessToken(userId: string, opts: { mfa?: boolean } = {}): string {
   return jwt.sign({ sub: userId, ...(opts.mfa ? { mfa: true } : {}) }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL })
 }
 
-// Émis quand un compte 2FA vient de passer le premier facteur : il n'ouvre
-// aucune route protégée (type '2fa' rejeté par le middleware d'auth), il ne
-// sert qu'à /auth/verify-2fa pour échanger le code contre un vrai jeton.
+// N'ouvre aucune route (type '2fa' rejeté par le middleware) : sert uniquement
+// à /auth/verify-2fa pour échanger le code contre un vrai jeton.
 export function signPendingTotpToken(userId: string): string {
   return jwt.sign({ sub: userId, type: '2fa' }, JWT_SECRET, { expiresIn: PENDING_TOTP_TTL })
 }

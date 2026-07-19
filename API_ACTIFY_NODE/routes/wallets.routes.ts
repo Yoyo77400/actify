@@ -10,5 +10,5 @@ walletsRouter.post('/verify', optionalAuth, walletsController.verify)
 
 walletsRouter.get('/', requireAuth, walletsController.list)
 walletsRouter.put('/:id', requireAuth, walletsController.update)
-// Déliaison d'un wallet (action sensible) : Bearer + 2FA (requireTotp).
+// Action sensible : 2FA requise.
 walletsRouter.delete('/:id', requireAuth, requireTotp, walletsController.remove)

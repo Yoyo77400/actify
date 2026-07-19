@@ -30,8 +30,7 @@ export function useWalletAuth() {
   // looks frozen.
   const step = ref<string | null>(null)
   const error = ref<string | null>(null)
-  // Set when the wallet signature passed but the account has 2FA on: holds the
-  // pending token to exchange for a real session once the code is entered.
+  // Pending token quand le wallet a signé mais que la 2FA est active.
   const totpPending = ref<string | null>(null)
   const verifying = ref(false)
 
@@ -99,7 +98,6 @@ export function useWalletAuth() {
    */
   async function loginWithWallet(id: WalletId) {
     await run(id, { auth: false }, async (result) => {
-      // 2FA active : on ne pose pas de session, on bascule sur la saisie du code.
       if (result.mode === 'totp_required') {
         totpPending.value = result.pendingToken
         return
@@ -120,7 +118,6 @@ export function useWalletAuth() {
     })
   }
 
-  // Second verrou : échange le pending token + code TOTP contre un vrai jeton.
   async function submitTotp(code: string) {
     if (!totpPending.value) return
     verifying.value = true

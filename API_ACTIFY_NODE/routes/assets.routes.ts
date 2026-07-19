@@ -20,7 +20,7 @@ assetsRouter.post('/:id/thumbnail', requireAuth, uploadSingleImage('thumbnail'),
 // the asset to be tokenized first.
 assetsRouter.post('/:id/tokenize/intent', requireAuth, tokenizeController.intent)
 assetsRouter.post('/:id/tokenize/confirm', requireAuth, tokenizeController.confirm)
-// Actions sensibles (destructive / mise en ligne) : Bearer + 2FA (requireTotp).
+// Actions sensibles : 2FA requise.
 assetsRouter.delete('/:id', requireAuth, requireTotp, assetsController.remove)
 assetsRouter.post('/:id/publish', requireAuth, requireTotp, assetsController.publish)
 assetsRouter.post('/:id/unpublish', requireAuth, assetsController.unpublish)

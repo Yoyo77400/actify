@@ -8,7 +8,7 @@ export const usersRouter = Router()
 // swallowed by the dynamic param route.
 usersRouter.get('/me', requireAuth, usersController.getMe)
 usersRouter.put('/me', requireAuth, usersController.updateMe)
-// Suppression de compte (action sensible) : Bearer + 2FA (requireTotp).
+// Action sensible : 2FA requise.
 usersRouter.delete('/me', requireAuth, requireTotp, usersController.deleteMe)
 usersRouter.get('/me/data-export', requireAuth, usersController.exportMyData)
 
