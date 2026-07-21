@@ -74,7 +74,7 @@ export async function verifyLoginTotp(pendingToken: string, code: string) {
 
   return {
     accessToken: signAccessToken(user.id, { mfa: true }),
-    refreshToken: signRefreshToken(user.id),
+    refreshToken: signRefreshToken(user.id, { mfa: true }),
     user: { id: user.id, username: user.username },
   }
 }

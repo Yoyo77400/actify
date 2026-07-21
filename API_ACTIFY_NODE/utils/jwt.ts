@@ -25,8 +25,10 @@ export function signPendingTotpToken(userId: string): string {
 
 // Stateless for now (no session store yet) — /auth/refresh will consume this
 // once the sessions/Auth2 work lands. No server-side revocation until then.
-export function signRefreshToken(userId: string): string {
-  return jwt.sign({ sub: userId, type: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_TTL })
+// Carries mfa too: token rotation must not downgrade a 2FA-validated session
+// (requireTotp would re-lock the account 15 minutes after login otherwise).
+export function signRefreshToken(userId: string, opts: { mfa?: boolean } = {}): string {
+  return jwt.sign({ sub: userId, type: 'refresh', ...(opts.mfa ? { mfa: true } : {}) }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_TTL })
 }
 
 export function verifyToken(token: string): jwt.JwtPayload | null {

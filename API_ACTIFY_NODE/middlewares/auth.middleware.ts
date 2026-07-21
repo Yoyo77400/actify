@@ -35,17 +35,19 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       throw new AppError(403, 'USER_BANNED', 'Compte banni')
     }
 
-    req.user = { id: resolved.user.id, mfa: resolved.mfa }
+    req.user = { id: resolved.user.id, mfa: resolved.mfa, twoFactorEnabled: resolved.user.twoFactorEnabled }
     next()
   } catch (err) {
     next(err)
   }
 }
 
-// À placer après requireAuth : exige un jeton mfa:true, sinon 403. Un compte
-// sans 2FA ne peut donc pas atteindre les routes ainsi gardées (voulu).
+// À placer après requireAuth. Step-up réservé aux comptes ayant ACTIVÉ la
+// 2FA : leur session doit avoir validé le 2e facteur (mfa:true, préservé au
+// refresh). Pour les autres, la signature wallet du login est l'unique
+// facteur — on ne bloque pas une action que le front ne sait pas re-challenger.
 export function requireTotp(req: Request, _res: Response, next: NextFunction) {
-  if (!req.user?.mfa) {
+  if (!req.user || (req.user.twoFactorEnabled && !req.user.mfa)) {
     return next(new AppError(403, 'TWO_FACTOR_REQUIRED', 'Authentification à deux facteurs requise pour cette action'))
   }
   next()
@@ -68,7 +70,7 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       if (resolved.user.isBanned) {
         throw new AppError(403, 'USER_BANNED', 'Compte banni')
       }
-      req.user = { id: resolved.user.id, mfa: resolved.mfa }
+      req.user = { id: resolved.user.id, mfa: resolved.mfa, twoFactorEnabled: resolved.user.twoFactorEnabled }
     }
     next()
   } catch (err) {
