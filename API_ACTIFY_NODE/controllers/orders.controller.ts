@@ -15,6 +15,11 @@ export async function list(req: Request, res: Response) {
   sendSuccess(res, items, meta)
 }
 
+export async function getPendingForAsset(req: Request, res: Response) {
+  const order = await ordersService.getPendingOrderForAsset(req.user!.id, String(req.params.assetId))
+  sendSuccess(res, order)
+}
+
 export async function getById(req: Request, res: Response) {
   const order = await ordersService.getOrder(req.user!.id, String(req.params.id))
   sendSuccess(res, order)
