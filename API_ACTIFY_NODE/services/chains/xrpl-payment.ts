@@ -1,8 +1,7 @@
 import { AppError } from '../../utils/http'
+import { fetchValidatedTx } from './xrpl-rpc'
 
-const DEFAULT_XRPL_RPC_URL = 'https://s.altnet.rippletest.net:51234/'
 const DROPS_PER_XRP = 1_000_000
-const TXN_NOT_FOUND_ERROR = 'txnNotFound'
 const PAYMENT_TX_TYPE = 'Payment'
 const TX_SUCCESS_RESULT = 'tesSUCCESS'
 
@@ -13,55 +12,18 @@ export interface XrplPaymentInput {
   minAmountXrp: number
 }
 
-interface XrplTxResult {
-  error?: string
-  validated?: boolean
-  TransactionType?: string
-  Destination?: string
-  DestinationTag?: number
-  meta?: { TransactionResult?: string; delivered_amount?: unknown; DeliveredAmount?: unknown }
-}
-
 /**
- * Verifies on the XRP Ledger (JSON-RPC `tx` call) that `txHash` is a
- * validated, successful Payment delivering at least `minAmountXrp` XRP to
- * `destination`, carrying the per-order `destinationTag`. The tag is what
- * binds a payment to one specific order: without it, any payment to the
- * seller could be replayed to confirm an order. Resolves on success, throws
- * an AppError describing the first failed check otherwise.
+ * Verifies on the XRP Ledger that `txHash` is a validated, successful Payment
+ * delivering at least `minAmountXrp` XRP to `destination`, carrying the
+ * per-order `destinationTag`. The tag is what binds a payment to one specific
+ * order: without it, any payment to the seller could be replayed to confirm
+ * an order. Waits for ledger validation via fetchValidatedTx — buyers paste
+ * the hash right after their wallet submits. Resolves on success, throws an
+ * AppError describing the first failed check otherwise.
  */
 export async function verifyXrplPayment(input: XrplPaymentInput): Promise<void> {
-  const rpcUrl = process.env.XRPL_RPC_URL ?? DEFAULT_XRPL_RPC_URL
+  const result = await fetchValidatedTx(input.txHash)
 
-  let result: XrplTxResult | undefined
-  try {
-    const response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ method: 'tx', params: [{ transaction: input.txHash }] }),
-    })
-    if (!response.ok) {
-      throw new Error(`XRPL RPC HTTP ${response.status}`)
-    }
-    result = ((await response.json()) as { result?: XrplTxResult }).result
-  } catch (err) {
-    // Network/DNS/TLS/timeout or malformed body: upstream fault, not a client
-    // error — surface it as a distinct 502 so retries and monitoring can tell
-    // it apart from a genuinely invalid transaction.
-    if (err instanceof AppError) throw err
-    throw new AppError(502, 'TX_LOOKUP_FAILED', 'Vérification de la transaction XRPL impossible')
-  }
-
-  if (!result || result.error) {
-    if (result?.error === TXN_NOT_FOUND_ERROR) {
-      throw new AppError(404, 'TX_NOT_FOUND', 'Transaction introuvable sur le ledger XRPL')
-    }
-    throw new AppError(502, 'TX_LOOKUP_FAILED', 'Vérification de la transaction XRPL impossible')
-  }
-
-  if (result.validated !== true) {
-    throw new AppError(400, 'TX_NOT_VALIDATED', 'Transaction non encore validée par le ledger XRPL')
-  }
   if (result.TransactionType !== PAYMENT_TX_TYPE) {
     throw new AppError(400, 'TX_NOT_PAYMENT', "La transaction n'est pas un paiement XRPL")
   }

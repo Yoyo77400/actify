@@ -37,6 +37,10 @@ function verify(minters = [MINTER]) {
 beforeEach(() => {
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
+  // One attempt by default: failure-path tests assert the final mapping and
+  // must not sit through the real submit→validation polling window.
+  vi.stubEnv('XRPL_TX_POLL_ATTEMPTS', '1')
+  vi.stubEnv('XRPL_TX_POLL_INTERVAL_MS', '1')
 })
 
 afterEach(() => {
@@ -98,5 +102,38 @@ describe('verifyXrplMint', () => {
   it('maps a network failure to 502 TX_LOOKUP_FAILED', async () => {
     fetchMock.mockRejectedValue(new TypeError('fetch failed'))
     await expect(verify()).rejects.toMatchObject({ status: 502, code: 'TX_LOOKUP_FAILED' })
+  })
+
+  it('polls until the submitted mint is validated (wallets return the hash pre-consensus)', async () => {
+    vi.stubEnv('XRPL_TX_POLL_ATTEMPTS', '3')
+    fetchMock
+      .mockResolvedValueOnce(rpcResponse({ error: 'txnNotFound' }))
+      .mockResolvedValueOnce(rpcResponse({ ...validMint, validated: false }))
+      .mockResolvedValueOnce(rpcResponse(validMint))
+    await expect(verify()).resolves.toMatchObject({ nftokenId: NFTOKEN_ID })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('retries transient network failures during polling', async () => {
+    vi.stubEnv('XRPL_TX_POLL_ATTEMPTS', '2')
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(rpcResponse(validMint))
+    await expect(verify()).resolves.toMatchObject({ nftokenId: NFTOKEN_ID })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry a definitive RPC error', async () => {
+    vi.stubEnv('XRPL_TX_POLL_ATTEMPTS', '5')
+    fetchMock.mockResolvedValue(rpcResponse({ error: 'internal' }))
+    await expect(verify()).rejects.toMatchObject({ status: 502, code: 'TX_LOOKUP_FAILED' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports TX_NOT_FOUND when the transaction never appears within the polling budget', async () => {
+    vi.stubEnv('XRPL_TX_POLL_ATTEMPTS', '3')
+    fetchMock.mockResolvedValue(rpcResponse({ error: 'txnNotFound' }))
+    await expect(verify()).rejects.toMatchObject({ status: 404, code: 'TX_NOT_FOUND' })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 })

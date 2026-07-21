@@ -44,9 +44,11 @@ export function flagsToGemwallet(flags: number): { tfTransferable?: boolean; tfB
   }
 }
 
+// Message is user-facing: pages surface it verbatim when the wallet flow
+// stops before reaching the API (rejection, unlinked address, …).
 export class WalletRejectedError extends Error {
-  constructor() {
-    super('Demande refusée dans le wallet')
+  constructor(message = 'Demande refusée dans le wallet') {
+    super(message)
     this.name = 'WalletRejectedError'
   }
 }

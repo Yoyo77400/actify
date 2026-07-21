@@ -24,6 +24,8 @@ interface RequestOptions {
   body?: unknown
   /** false = never send the Authorization header (anonymous-by-intent calls, e.g. wallet login). */
   auth?: boolean
+  /** Overrides the default 15s timeout — for calls that wait on XRPL consensus server-side. */
+  timeoutMs?: number
 }
 
 /** Extracts the backend's error payload from a failed request, if any. */
@@ -49,7 +51,7 @@ export function useApi() {
       // Callers pass typed DTOs; ofetch serializes any plain object to JSON.
       body: opts.body as Record<string, unknown> | undefined,
       headers: sendAuth ? { Authorization: `Bearer ${store.accessToken}` } : {},
-      timeout: REQUEST_TIMEOUT_MS,
+      timeout: opts.timeoutMs ?? REQUEST_TIMEOUT_MS,
     })
     return res.data
   }
@@ -105,7 +107,7 @@ export function useApi() {
 
   return {
     get: <T>(path: string, opts?: Pick<RequestOptions, 'auth'>) => request<T>(path, opts),
-    post: <T>(path: string, body?: unknown, opts?: Pick<RequestOptions, 'auth'>) =>
+    post: <T>(path: string, body?: unknown, opts?: Pick<RequestOptions, 'auth' | 'timeoutMs'>) =>
       request<T>(path, { ...opts, method: 'POST', body }),
     put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
     del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),

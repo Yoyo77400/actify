@@ -27,6 +27,10 @@ function verify(minAmountXrp = 5) {
 beforeEach(() => {
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
+  // One attempt by default: failure-path tests assert the final mapping and
+  // must not sit through the real submit→validation polling window.
+  vi.stubEnv('XRPL_TX_POLL_ATTEMPTS', '1')
+  vi.stubEnv('XRPL_TX_POLL_INTERVAL_MS', '1')
 })
 
 afterEach(() => {
@@ -41,7 +45,7 @@ describe('verifyXrplPayment', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://s.altnet.rippletest.net:51234/', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ method: 'tx', params: [{ transaction: TX_HASH }] }),
+      body: JSON.stringify({ method: 'tx', params: [{ transaction: TX_HASH, binary: false }] }),
     })
   })
 
@@ -138,5 +142,15 @@ describe('verifyXrplPayment', () => {
   it('maps a malformed JSON body to 502 TX_LOOKUP_FAILED', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => { throw new SyntaxError('bad json') } })
     await expect(verify()).rejects.toMatchObject({ status: 502, code: 'TX_LOOKUP_FAILED' })
+  })
+
+  it('polls until the submitted payment is validated (hash pasted right after submit)', async () => {
+    vi.stubEnv('XRPL_TX_POLL_ATTEMPTS', '3')
+    fetchMock
+      .mockResolvedValueOnce(rpcResponse({ error: 'txnNotFound' }))
+      .mockResolvedValueOnce(rpcResponse({ ...validPayment, validated: false }))
+      .mockResolvedValueOnce(rpcResponse(validPayment))
+    await expect(verify()).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 })
