@@ -26,3 +26,6 @@ API_ACTIFY_NODE/dist/
 
 # Smart Contracts
 /SMART_CONTRACTS
+
+# Local project context (never commit team/session notes)
+/PROJECT_MEMORY.local.md

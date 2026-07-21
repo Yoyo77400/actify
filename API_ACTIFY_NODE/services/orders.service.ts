@@ -44,6 +44,12 @@ const LISTING_SUMMARY_INCLUDE = {
   },
 } as const
 
+const PENDING_ORDER_INCLUDE = {
+  listing: {
+    select: { ...LISTING_SUMMARY_INCLUDE.listing.select, currency: true },
+  },
+} as const
+
 type OrderWithListing = Awaited<ReturnType<typeof getOwnedOrderOrThrow>>
 
 export interface CreateOrderInput {
@@ -173,6 +179,24 @@ export async function listOrders(userId: string, pagination: Pagination) {
 
 export async function getOrder(userId: string, orderId: string) {
   return serializeOrder(await getOwnedOrderOrThrow(userId, orderId))
+}
+
+export async function getPendingOrderForAsset(userId: string, listingId: string) {
+  const purchase = await prisma.purchase.findFirst({
+    where: { buyerId: userId, listingId, status: ORDER_PENDING },
+    include: PENDING_ORDER_INCLUDE,
+    orderBy: { purchasedAt: 'desc' },
+  })
+
+  if (!purchase) return null
+
+  return {
+    ...serializeOrder(purchase),
+    currency: purchase.listing.currency,
+    paymentAddress: purchase.paymentAddress,
+    paymentTag: purchase.paymentTag,
+    expiresAt: new Date(purchase.purchasedAt.getTime() + ORDER_TTL_MS),
+  }
 }
 
 export async function confirmOrder(userId: string, orderId: string, txHash: unknown) {

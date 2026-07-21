@@ -6,6 +6,7 @@ export const ordersRouter = Router()
 
 ordersRouter.post('/', requireAuth, ordersController.create)
 ordersRouter.get('/', requireAuth, ordersController.list)
+ordersRouter.get('/pending/:assetId', requireAuth, ordersController.getPendingForAsset)
 ordersRouter.get('/:id', requireAuth, ordersController.getById)
 // Action sensible : 2FA requise.
 ordersRouter.post('/:id/confirm', requireAuth, requireTotp, ordersController.confirm)

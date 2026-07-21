@@ -100,14 +100,22 @@
             <p class="ethnocentric text-foreground text-2xl mt-1">{{ priceLabel }}</p>
           </div>
 
-          <!-- Order created -> payment instructions -->
+          <!-- Order created -> payment instructions and ledger confirmation -->
           <div v-if="order" class="flex flex-col gap-3">
-            <div class="flex items-center gap-2 text-success text-sm">
+            <div v-if="confirmedTxHash" class="flex flex-col gap-3">
+              <div class="flex items-center gap-2 text-success text-sm">
+                <Icon name="ph:check-circle" class="text-lg shrink-0" />
+                <span>Paiement confirmé. L'asset est maintenant disponible dans vos achats.</span>
+              </div>
+              <p class="text-muted-2 text-xs font-mono break-all">{{ confirmedTxHash }}</p>
+            </div>
+
+            <div v-else class="flex items-center gap-2 text-success text-sm">
               <Icon name="ph:check-circle" class="text-lg shrink-0" />
               <span>Commande créée — en attente de paiement.</span>
             </div>
 
-            <div class="rounded-xl border border-line bg-panel-3 p-4 flex flex-col gap-3">
+            <div v-if="!confirmedTxHash" class="rounded-xl border border-line bg-panel-3 p-4 flex flex-col gap-3">
               <div>
                 <p class="text-muted text-xs uppercase tracking-widest">Montant à envoyer</p>
                 <p class="text-foreground text-lg font-mono mt-1">{{ order.amount }} {{ order.currency }}</p>
@@ -146,12 +154,41 @@
               </div>
             </div>
 
-            <p class="text-warning text-xs leading-relaxed flex gap-2">
+            <p v-if="!confirmedTxHash" class="text-warning text-xs leading-relaxed flex gap-2">
               <Icon name="ph:warning" class="text-sm shrink-0 mt-0.5" />
               <span>Envoyez le paiement avec ce DestinationTag exact, sinon la commande ne pourra pas être confirmée.</span>
             </p>
 
-            <p class="text-muted-2 text-xs">
+            <form v-if="!confirmedTxHash" class="flex flex-col gap-2" @submit.prevent="confirmPayment">
+              <label for="payment-tx-hash" class="text-muted text-xs uppercase tracking-widest">
+                Hash de transaction XRPL
+              </label>
+              <input
+                id="payment-tx-hash"
+                v-model.trim="txHash"
+                class="input font-mono"
+                type="text"
+                inputmode="text"
+                maxlength="64"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="64 caractères hexadécimaux"
+              >
+              <button
+                type="submit"
+                class="primary-btn w-full"
+                :disabled="confirming || !isTxHashValid"
+              >
+                <span v-if="!confirming">Confirmer le paiement</span>
+                <span v-else class="flex items-center justify-center gap-2">
+                  <span class="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Vérification…
+                </span>
+              </button>
+              <p v-if="confirmError" class="text-danger text-xs" role="alert">{{ confirmError }}</p>
+            </form>
+
+            <p v-if="!confirmedTxHash" class="text-muted-2 text-xs">
               Expire le {{ new Date(order.expiresAt).toLocaleString('fr-FR') }}.
             </p>
           </div>
@@ -249,6 +286,7 @@ type LoadResult =
 
 const route = useRoute()
 const assets = useAssets()
+const orders = useOrders()
 const { user, isLoggedIn } = useAuth()
 
 const assetId = String(route.params.id)
@@ -317,10 +355,24 @@ function truncateMiddle(value: string, head = 10, tail = 8): string {
 }
 
 // ─── Buy flow ───
-const order = ref<OrderCreated | null>(null)
+const { data: recoveredOrder } = await useAsyncData<OrderCreated | null>(
+  `pending-order:${user.value?.id ?? 'guest'}:${assetId}`,
+  async () => {
+    const currentAsset = asset.value
+    if (!isLoggedIn.value || !currentAsset || currentAsset.isFree || isOwner.value) return null
+    return orders.getPendingForAsset(currentAsset.id)
+  },
+)
+
+const order = ref<OrderCreated | null>(recoveredOrder.value ?? null)
 const ordering = ref(false)
 const orderError = ref<string | null>(null)
 const orderErrorCode = ref<string | null>(null)
+const txHash = ref('')
+const confirming = ref(false)
+const confirmError = ref<string | null>(null)
+const confirmedTxHash = ref<string | null>(null)
+const isTxHashValid = computed(() => /^[0-9a-fA-F]{64}$/.test(txHash.value))
 
 async function buy() {
   const a = asset.value
@@ -329,7 +381,7 @@ async function buy() {
   orderError.value = null
   orderErrorCode.value = null
   try {
-    order.value = await assets.createOrder(a.id)
+    order.value = await orders.create(a.id)
   } catch (err) {
     const apiErr = toApiError(err)
     orderErrorCode.value = apiErr?.code ?? null
@@ -337,6 +389,26 @@ async function buy() {
       ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'La commande n\'a pas pu être créée.')
   } finally {
     ordering.value = false
+  }
+}
+
+async function confirmPayment() {
+  const pendingOrder = order.value
+  if (!pendingOrder || !isTxHashValid.value) return
+
+  confirming.value = true
+  confirmError.value = null
+  try {
+    const confirmed = await orders.confirm(pendingOrder.id, txHash.value)
+    pendingOrder.status = confirmed.status
+    confirmedTxHash.value = confirmed.txHash
+    await refresh()
+  } catch (err) {
+    const apiErr = toApiError(err)
+    confirmError.value = apiErr?.message
+      ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'Le paiement n\'a pas pu être vérifié.')
+  } finally {
+    confirming.value = false
   }
 }
 
