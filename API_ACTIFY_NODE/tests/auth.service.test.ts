@@ -28,6 +28,17 @@ describe('refreshSession', () => {
     expect(verifyToken(refreshToken)?.type).toBe('refresh')
   })
 
+  it('preserves the mfa level across rotation (2FA session must not downgrade)', async () => {
+    findUnique.mockResolvedValue(activeUser as never)
+    const { accessToken, refreshToken } = await refreshSession(signRefreshToken('user-1', { mfa: true }))
+    expect(verifyToken(accessToken)?.mfa).toBe(true)
+    expect(verifyToken(refreshToken)?.mfa).toBe(true)
+
+    // And the absence of mfa stays absent — rotation never grants it.
+    const plain = await refreshSession(signRefreshToken('user-1'))
+    expect(verifyToken(plain.accessToken)?.mfa).toBeUndefined()
+  })
+
   it('rejects an access token used as refresh token', async () => {
     await expect(refreshSession(signAccessToken('user-1'))).rejects.toMatchObject(
       new AppError(401, 'AUTH_REQUIRED', 'Refresh token invalide ou expiré'),

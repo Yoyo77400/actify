@@ -15,14 +15,21 @@ function run(user: unknown) {
   return next as unknown as ReturnType<typeof vi.fn>
 }
 
+// Step-up semantics: the wallet signature is the primary factor; only accounts
+// that ENABLED 2FA must present an mfa-validated session on guarded routes.
 describe('requireTotp', () => {
-  it('passes when the session cleared the 2nd factor (mfa === true)', () => {
-    const next = run({ id: 'u1', mfa: true })
+  it('passes an account without 2FA enabled (wallet signature is the only factor)', () => {
+    const next = run({ id: 'u1', mfa: false, twoFactorEnabled: false })
     expect(next).toHaveBeenCalledWith() // called with no error
   })
 
-  it('blocks with 403 TWO_FACTOR_REQUIRED when mfa is false', () => {
-    const next = run({ id: 'u1', mfa: false })
+  it('passes a 2FA account whose session cleared the 2nd factor (mfa === true)', () => {
+    const next = run({ id: 'u1', mfa: true, twoFactorEnabled: true })
+    expect(next).toHaveBeenCalledWith()
+  })
+
+  it('blocks a 2FA account whose session never validated the 2nd factor', () => {
+    const next = run({ id: 'u1', mfa: false, twoFactorEnabled: true })
     const err = next.mock.calls[0][0]
     expect(err).toBeInstanceOf(AppError)
     expect(err.status).toBe(403)
