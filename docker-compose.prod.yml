@@ -40,6 +40,10 @@ services:
       # (per the terms of service); the passthrough only exists to point at a
       # local rippled, never mainnet.
       XRPL_RPC_URL: ${XRPL_RPC_URL:-https://s.altnet.rippletest.net:51234/}
+      # On-chain verification polls `tx` until consensus validation (wallets
+      # return the hash at submission, ~3-5s earlier). Code defaults: 8 × 1500ms.
+      XRPL_TX_POLL_ATTEMPTS: ${XRPL_TX_POLL_ATTEMPTS:-8}
+      XRPL_TX_POLL_INTERVAL_MS: ${XRPL_TX_POLL_INTERVAL_MS:-1500}
       # Wallet auto-promoted to admin on login (empty = disabled).
       ADMIN_WALLET_ADDRESS: ${ADMIN_WALLET_ADDRESS:-}
       # Where uploaded asset files are stored (persisted via the volume below).

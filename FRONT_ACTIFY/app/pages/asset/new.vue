@@ -414,6 +414,14 @@ async function onWalletSelect(id: WalletId) {
     tokenized.value = true
     await runPublish()
   } catch (err) {
+    // ALREADY_TOKENIZED on a retry means a previous confirm DID reach the
+    // server (e.g. the client timed out while the NFT was being recorded):
+    // the asset is tokenized — continue to publish instead of showing an error.
+    if (toApiError(err)?.code === 'ALREADY_TOKENIZED') {
+      tokenized.value = true
+      await runPublish()
+      return
+    }
     // The draft still exists on the API; the user can pick a wallet and retry.
     // A retry re-confirms the already-signed mint instead of minting again.
     error.value = toApiError(err)?.message
