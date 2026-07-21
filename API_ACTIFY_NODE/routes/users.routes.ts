@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { requireAuth } from '../middlewares/auth.middleware'
+import { requireAuth, requireTotp } from '../middlewares/auth.middleware'
 import * as usersController from '../controllers/users.controller'
 
 export const usersRouter = Router()
@@ -8,8 +8,8 @@ export const usersRouter = Router()
 // swallowed by the dynamic param route.
 usersRouter.get('/me', requireAuth, usersController.getMe)
 usersRouter.put('/me', requireAuth, usersController.updateMe)
-// TODO(auth2): gate behind TOTP once 2FA enrollment exists (Bearer token + TOTP per spec).
-usersRouter.delete('/me', requireAuth, usersController.deleteMe)
+// Action sensible : 2FA requise.
+usersRouter.delete('/me', requireAuth, requireTotp, usersController.deleteMe)
 usersRouter.get('/me/data-export', requireAuth, usersController.exportMyData)
 
 usersRouter.get('/:username', usersController.getPublicProfile)

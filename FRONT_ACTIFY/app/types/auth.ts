@@ -33,6 +33,7 @@ export interface MeProfile {
   wallets: WalletInfo[]
   role: string
   isVerified: boolean
+  twoFactorEnabled: boolean
   createdAt: string
   stats: MeStats
 }
@@ -55,4 +56,26 @@ export interface WalletVerifyLinked {
   mode: 'linked'
 }
 
-export type WalletVerifyResult = WalletVerifyAuthenticated | WalletVerifyLinked
+// 2FA active : login pas encore ouvert, échanger pendingToken + code TOTP.
+export interface WalletVerifyTotpRequired {
+  mode: 'totp_required'
+  requires2FA: true
+  pendingToken: string
+}
+
+export type WalletVerifyResult =
+  | WalletVerifyAuthenticated
+  | WalletVerifyLinked
+  | WalletVerifyTotpRequired
+
+export interface TwoFactorSetup {
+  qrCode: string
+  secret: string
+  otpauthUri: string
+}
+
+export interface TwoFactorLoginResult {
+  accessToken: string
+  refreshToken: string
+  user: { id: string; username: string | null }
+}
