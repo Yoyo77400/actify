@@ -52,6 +52,10 @@ services:
       - actify_uploads:/app/uploads
     networks:
       - actify-prod
+      # actify-prod is internal:true, which blocks ALL egress — without this
+      # extra outbound-only network the api can never reach the XRPL RPC and
+      # every mint/payment verification fails with TX_LOOKUP_FAILED.
+      - xrpl-egress
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -154,6 +158,9 @@ volumes:
 networks:
   actify-prod:
     internal: true
+  # Outbound-only path to the XRPL JSON-RPC endpoint. The api publishes no
+  # port, so it remains unreachable from outside; this only restores egress.
+  xrpl-egress:
   # Umami ↔ its database only — isolated from the app's actify-prod perimeter.
   umami-internal:
     internal: true
