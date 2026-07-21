@@ -15,6 +15,14 @@ export const walletDescriptors: WalletDescriptor[] = [
 ]
 
 export async function getWalletAdapter(id: WalletId): Promise<WalletAdapter> {
+  // E2E seam: when running a dev build under Playwright (which injects
+  // window.__ACTIFY_E2E_WALLET__), swap the real extension adapters for an
+  // in-page signer that produces genuine XRPL signatures. Guarded by
+  // import.meta.dev so it is tree-shaken out of production builds.
+  if (import.meta.dev && typeof window !== 'undefined' && window.__ACTIFY_E2E_WALLET__?.seed) {
+    return (await import('./e2e')).makeE2eAdapter(id)
+  }
+
   switch (id) {
     case 'gemwallet':
       return (await import('./gemwallet')).gemwalletAdapter
