@@ -2,8 +2,14 @@ import type { ErrorRequestHandler } from 'express'
 import { MulterError } from 'multer'
 import { AppError } from '../utils/http'
 
-export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof AppError) {
+    // On-chain verification failures (TX_*) and upstream faults are the
+    // operational signals of this API — keep a server-side trace, the client
+    // only ever sees the JSON envelope.
+    if (err.status >= 500 || err.code.startsWith('TX_')) {
+      console.error(`[${req.method} ${req.originalUrl}] ${err.status} ${err.code}: ${err.message}`)
+    }
     res.status(err.status).json({
       success: false,
       error: { code: err.code, message: err.message, details: err.details ?? {} },

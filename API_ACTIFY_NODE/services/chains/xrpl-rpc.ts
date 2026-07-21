@@ -7,6 +7,11 @@ const TXN_NOT_FOUND_ERROR = 'txnNotFound'
 // ledger closes without exceeding the frontend's 30s confirm timeout.
 const DEFAULT_POLL_ATTEMPTS = 8
 const DEFAULT_POLL_INTERVAL_MS = 1500
+// A hung RPC call must not eat the whole polling budget, and the poll as a
+// whole must resolve into a proper HTTP error before the frontend gives up
+// on the confirm request (30s): bound each attempt and the total wait.
+const RPC_ATTEMPT_TIMEOUT_MS = 5000
+const POLL_DEADLINE_MS = 20_000
 
 /** Union of the `tx` response fields Actify checks across Payment and NFTokenMint. */
 export interface XrplTx {
@@ -42,6 +47,7 @@ async function requestTx(rpcUrl: string, txHash: string): Promise<XrplTx | undef
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ method: 'tx', params: [{ transaction: txHash, binary: false }] }),
+    signal: AbortSignal.timeout(RPC_ATTEMPT_TIMEOUT_MS),
   })
   if (!response.ok) {
     throw new Error(`XRPL RPC HTTP ${response.status}`)
@@ -62,9 +68,13 @@ export async function fetchValidatedTx(txHash: string): Promise<XrplTx> {
   const attempts = positiveEnvInt('XRPL_TX_POLL_ATTEMPTS', DEFAULT_POLL_ATTEMPTS)
   const intervalMs = positiveEnvInt('XRPL_TX_POLL_INTERVAL_MS', DEFAULT_POLL_INTERVAL_MS)
 
+  const deadline = Date.now() + POLL_DEADLINE_MS
   let lastOutcome: 'network' | 'not-found' | 'not-validated' | 'rpc-error' = 'network'
   for (let attempt = 0; attempt < attempts; attempt++) {
-    if (attempt > 0) await sleep(intervalMs)
+    if (attempt > 0) {
+      if (Date.now() + intervalMs >= deadline) break
+      await sleep(intervalMs)
+    }
 
     let result: XrplTx | undefined
     try {
