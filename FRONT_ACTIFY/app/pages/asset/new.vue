@@ -262,7 +262,7 @@
 
 <script setup lang="ts">
 import type { AssetCard, CategoryWithCount, CreateAssetBody } from '~/types/asset'
-import type { WalletId } from '~/lib/wallets'
+import { WalletRejectedError, type WalletId } from '~/lib/wallets'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -415,8 +415,12 @@ async function onWalletSelect(id: WalletId) {
     await runPublish()
   } catch (err) {
     // The draft still exists on the API; the user can pick a wallet and retry.
+    // A retry re-confirms the already-signed mint instead of minting again.
     error.value = toApiError(err)?.message
-      ?? 'La tokenisation a échoué. Votre brouillon est conservé — vous pouvez relancer le mint.'
+      ?? (err instanceof WalletRejectedError ? err.message : null)
+      ?? (isNetworkError(err)
+        ? 'Connexion au serveur impossible. Votre brouillon est conservé — relancez le mint.'
+        : 'La tokenisation a échoué. Votre brouillon est conservé — vous pouvez relancer le mint.')
   } finally {
     pendingWallet.value = null
   }
