@@ -25,9 +25,11 @@ export async function refreshSession(refreshToken: string) {
 
   // Rotation: hand back a fresh refresh token so clients always hold the
   // newest one. Statelessness means the old token stays valid until expiry —
-  // true revocation needs the session store.
+  // true revocation needs the session store. The session's mfa level is
+  // carried over: rotation must not downgrade a 2FA-validated login.
+  const mfa = payload.mfa === true
   return {
-    accessToken: signAccessToken(user.id),
-    refreshToken: signRefreshToken(user.id),
+    accessToken: signAccessToken(user.id, { mfa }),
+    refreshToken: signRefreshToken(user.id, { mfa }),
   }
 }
