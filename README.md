@@ -194,12 +194,24 @@ docker run -p 3000:80 actify-frontend
 
 ## Tests
 
-> Pas encore implémenté
+### Tests end-to-end (Playwright)
 
-Prévu :
+```bash
+cd FRONT_ACTIFY
+npx playwright install        # 1re fois seulement : télécharge le navigateur chromium (local)
 
-* Tests unitaires (Vitest)
-* Tests E2E (Playwright)
+npm run test:e2e              # headless (tout démarre/s'arrête automatiquement)
+npm run test:e2e:headed       # Chrome visible + ralenti (pour observer les clics)
+npm run test:e2e:ui           # mode interactif (timeline, re-run)
+npm run test:e2e:report       # rapport HTML du dernier run
+```
+
+Ne lancer qu'**un seul test** 
+
+```bash
+# -- passe l'option à Playwright ; -g = --grep (filtre sur le titre du test)
+npm run test:e2e -- -g "newWalletCreatesAccountAndOpensSession"
+```
 
 ---
 
