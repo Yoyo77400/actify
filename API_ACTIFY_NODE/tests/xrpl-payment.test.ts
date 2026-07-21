@@ -46,6 +46,7 @@ describe('verifyXrplPayment', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ method: 'tx', params: [{ transaction: TX_HASH, binary: false }] }),
+      signal: expect.any(AbortSignal),
     })
   })
 
