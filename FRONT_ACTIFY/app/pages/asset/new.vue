@@ -204,7 +204,11 @@
               class="input file:mr-3 file:rounded-md file:border-0 file:bg-panel-3 file:px-3 file:py-1.5 file:text-foreground"
               @change="onThumbnailPick"
             >
-            <p v-if="thumbnailName" class="text-muted text-xs">Sélectionné : {{ thumbnailName }}</p>
+            <p class="text-muted text-xs">
+              {{ thumbnailName
+                ? `Sélectionné : ${thumbnailName}`
+                : 'Visuel affiché sur le marketplace. Sans miniature, votre fichier est réutilisé s\'il est une image.' }}
+            </p>
           </div>
         </section>
 
@@ -393,8 +397,13 @@ async function onSubmit() {
   try {
     const draft = await assets.create(buildBody())
     await assets.uploadFile(draft.id, file.value)
-    if (thumbnail.value) {
-      await assets.uploadThumbnail(draft.id, thumbnail.value)
+    // The thumbnail is the asset's public visual. When the main file is
+    // itself an image and no dedicated thumbnail was picked, reuse it —
+    // a seller uploading an image expects THAT image on the card.
+    const displayImage = thumbnail.value
+      ?? (file.value.type.startsWith('image/') ? file.value : null)
+    if (displayImage) {
+      await assets.uploadThumbnail(draft.id, displayImage)
     }
     created.value = draft
     phase.value = 'tokenize'
