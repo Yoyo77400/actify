@@ -13,14 +13,13 @@
  *       reads it at import time). Playwright starts it as a webServer.
  */
 import { readFileSync, readdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const API_ROOT = join(HERE, '..', '..')
+// CommonJS build (see tsconfig `module`): __dirname, not import.meta.
+const API_ROOT = join(__dirname, '..', '..')
 const MIGRATIONS_DIR = join(API_ROOT, 'prisma', 'migrations')
 
 const DB_PORT = Number(process.env.E2E_DB_PORT) || 5544
