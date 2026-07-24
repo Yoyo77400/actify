@@ -1,18 +1,7 @@
 <template>
   <div class="flex flex-col gap-6 max-w-2xl">
 
-    <div class="flex gap-1 border-b border-white/10 pb-0">
-      <NuxtLink
-        to="/settings/security"
-        class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors"
-        :class="route.path === '/settings/security' ? 'text-foreground border-b-2 border-accent -mb-px' : 'text-muted hover:text-foreground'"
-      >Security</NuxtLink>
-      <NuxtLink
-        to="/settings/wallet"
-        class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors"
-        :class="route.path === '/settings/wallet' ? 'text-foreground border-b-2 border-accent -mb-px' : 'text-muted hover:text-foreground'"
-      >Wallet</NuxtLink>
-    </div>
+    <SettingsTabs />
 
     <div class="flex items-center gap-4">
       <div class="w-12 h-12 rounded-xl bg-gradient-to-b from-[#7c5cbf] to-[#4a2d8a] flex items-center justify-center shrink-0">
@@ -93,7 +82,6 @@ import type { TwoFactorSetup } from '~/types/auth'
 definePageMeta({ middleware: 'auth' })
 useHead({ title: 'Security Settings' })
 
-const route = useRoute()
 const { user, fetchMe } = useAuth()
 const { setup, confirm } = useTwoFactor()
 
