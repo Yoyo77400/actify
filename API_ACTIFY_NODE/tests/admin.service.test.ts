@@ -6,17 +6,21 @@ vi.mock('../services/prisma', () => ({
     user: { findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     purchase: { findMany: vi.fn(), count: vi.fn(), aggregate: vi.fn() },
     role: { findFirst: vi.fn() },
+    report: { findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   },
 }))
 
 import { prisma } from '../services/prisma'
+import { AppError } from '../utils/http'
 import {
   forceDeleteAsset,
   getAdminStats,
   getUserDetail,
   listAllAssets,
   listOrders,
+  listReports,
   listUsers,
+  resolveReport,
   setUserBanStatus,
   updateAssetStatus,
   updateUserRole,
@@ -35,6 +39,10 @@ const purchaseFindMany = vi.mocked(prisma.purchase.findMany)
 const purchaseCount = vi.mocked(prisma.purchase.count)
 const purchaseAggregate = vi.mocked(prisma.purchase.aggregate)
 const roleFindFirst = vi.mocked(prisma.role.findFirst)
+const reportFindMany = vi.mocked(prisma.report.findMany)
+const reportCount = vi.mocked(prisma.report.count)
+const reportFindUnique = vi.mocked(prisma.report.findUnique)
+const reportUpdate = vi.mocked(prisma.report.update)
 
 const pagination = { page: 1, limit: 20, skip: 0 }
 
@@ -374,5 +382,99 @@ describe('getAdminStats', () => {
       totalOrders: 40,
       confirmedRevenue: 123.45,
     })
+  })
+})
+
+const reportRow = {
+  id: 'r1',
+  targetType: 'asset',
+  targetId: 'l1',
+  reason: 'copyright',
+  details: 'Contenu copié',
+  status: 'Pending',
+  resolutionNote: null,
+  resolvedAt: null,
+  createdAt: new Date('2026-07-01'),
+  reporter: { id: 'u2', username: 'bob', displayName: null },
+  resolvedBy: null,
+}
+
+describe('listReports', () => {
+  it('lists reports newest first, filterable by status and targetType', async () => {
+    reportFindMany.mockResolvedValue([reportRow] as never)
+    reportCount.mockResolvedValue(1)
+
+    const { items, meta } = await listReports({ status: 'Pending', targetType: 'asset' }, pagination)
+
+    expect(items).toEqual([
+      {
+        id: 'r1',
+        targetType: 'asset',
+        targetId: 'l1',
+        reason: 'copyright',
+        details: 'Contenu copié',
+        status: 'Pending',
+        resolutionNote: null,
+        resolvedAt: null,
+        createdAt: reportRow.createdAt,
+        reporter: reportRow.reporter,
+        resolvedBy: null,
+      },
+    ])
+    expect(meta.total).toBe(1)
+    expect(reportFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'Pending', targetType: 'asset' } }),
+    )
+  })
+})
+
+describe('resolveReport', () => {
+  it('resolves a pending report and stamps the resolving admin', async () => {
+    reportFindUnique.mockResolvedValue({ ...reportRow, status: 'Pending' } as never)
+    reportUpdate.mockResolvedValue({
+      ...reportRow,
+      status: 'Resolved',
+      resolutionNote: 'Asset supprimé',
+      resolvedAt: new Date('2026-07-02'),
+      resolvedBy: { id: 'admin-1', username: 'root', displayName: null },
+    } as never)
+
+    const result = await resolveReport('admin-1', 'r1', { status: 'Resolved', resolutionNote: 'Asset supprimé' })
+
+    expect(result).toMatchObject({ status: 'Resolved', resolutionNote: 'Asset supprimé' })
+    expect(reportUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'r1' },
+        data: expect.objectContaining({
+          status: 'Resolved',
+          resolutionNote: 'Asset supprimé',
+          resolvedById: 'admin-1',
+        }),
+      }),
+    )
+  })
+
+  it('rejects an invalid status', async () => {
+    await expect(resolveReport('admin-1', 'r1', { status: 'Pending' })).rejects.toMatchObject(
+      new AppError(400, 'VALIDATION_ERROR', 'status doit être l\'un de : Resolved, Rejected'),
+    )
+    expect(reportFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('returns 404 for an unknown report', async () => {
+    reportFindUnique.mockResolvedValue(null)
+    await expect(resolveReport('admin-1', 'missing', { status: 'Resolved' })).rejects.toMatchObject({
+      status: 404,
+      code: 'NOT_FOUND',
+    })
+  })
+
+  it('rejects a report that was already resolved', async () => {
+    reportFindUnique.mockResolvedValue({ ...reportRow, status: 'Resolved' } as never)
+    await expect(resolveReport('admin-1', 'r1', { status: 'Rejected' })).rejects.toMatchObject({
+      status: 409,
+      code: 'REPORT_ALREADY_RESOLVED',
+    })
+    expect(reportUpdate).not.toHaveBeenCalled()
   })
 })

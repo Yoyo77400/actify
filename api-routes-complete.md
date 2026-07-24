@@ -2,7 +2,7 @@
 
 > Version alignée sur le schéma PostgreSQL. Toutes les routes supposent un prefix `/api/v1`.
 
-## Statut d'implémentation (2026-07-11)
+## Statut d'implémentation (2026-07-23)
 
 | Module | Statut |
 |---|---|
@@ -12,9 +12,12 @@
 | Orders (+ vérification paiement on-chain XRPL Testnet) | ✅ Implémenté |
 | Downloads (token signé 1h → redirect IPFS) | ✅ Implémenté |
 | Recherche, Stats publiques, Stats créateur | ✅ Implémenté |
-| Admin (assets, users, orders, stats) | ✅ Implémenté |
-| TOTP, logout/sessions (révocation serveur) | ⏳ Différé — lot "Auth2" |
-| Policies, versions, upload fichiers (AES), notifications, consents, reports, resale, mint NFT, payouts, WebSocket, rate limiting | ⏳ Différé — pas de modèle/infra en base pour l'instant |
+| Admin (assets, users, orders, stats, reports) | ✅ Implémenté |
+| TOTP (2FA), Mint NFT, Rate limiting | ✅ Implémenté |
+| Reports (signalements), Notifications, Consents (RGPD) | ✅ Implémenté |
+| Upload de fichiers | ⚠️ Implémenté mais **sans** le chiffrement AES-256-GCM annoncé (stockage en clair) |
+| logout/sessions (révocation serveur) | ⏳ Différé — lot "Auth2" |
+| Policies, versions, resale (transfert/achat), payouts, WebSocket | ⏳ Différé — pas de modèle/infra en base pour l'instant |
 
 ---
 
@@ -695,6 +698,7 @@ Le wallet est l'unique moyen de connexion : `challenge` + `verify` font office d
 | `TX_AMOUNT_TOO_LOW` | 400 | Montant on-chain inférieur au prix |
 | `TX_ALREADY_USED` | 409 | Ce hash de transaction a déjà confirmé une commande |
 | `TX_LOOKUP_FAILED` | 502 | Nœud XRPL injoignable / réponse invalide |
+| `REPORT_ALREADY_RESOLVED` | 409 | Ce signalement a déjà été traité (résolu ou rejeté) |
 
 ### Headers personnalisés
 

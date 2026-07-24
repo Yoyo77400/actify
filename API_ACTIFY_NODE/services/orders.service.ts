@@ -3,6 +3,7 @@ import { prisma } from './prisma'
 import { AppError, buildMeta } from '../utils/http'
 import type { Pagination } from '../utils/pagination'
 import { verifyXrplPayment } from './chains/xrpl-payment'
+import { notifyUser } from './notifications.service'
 
 const ORDER_PENDING = 'Pending'
 const ORDER_CONFIRMED = 'Confirmed'
@@ -249,6 +250,13 @@ export async function confirmOrder(userId: string, orderId: string, txHash: unkn
   if (affected.count === 0) {
     throw new AppError(409, 'ORDER_NOT_PENDING', 'La commande a déjà été traitée')
   }
+
+  await notifyUser(
+    purchase.listing.sellerId,
+    'order:confirmed',
+    `Nouvelle vente confirmée : "${purchase.listing.title}"`,
+    { orderId: purchase.id, listingId: purchase.listing.id },
+  )
 
   return serializeOrder({ ...purchase, status: ORDER_CONFIRMED, txHash: normalizedTxHash })
 }

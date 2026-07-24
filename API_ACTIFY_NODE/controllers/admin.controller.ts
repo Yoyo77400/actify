@@ -76,3 +76,24 @@ export async function listOrders(req: Request, res: Response) {
 export async function getStats(_req: Request, res: Response) {
   sendSuccess(res, await adminService.getAdminStats())
 }
+
+export async function listReports(req: Request, res: Response) {
+  const pagination = parsePagination(req.query as Record<string, unknown>)
+  const query = req.query as Record<string, unknown>
+
+  const { items, meta } = await adminService.listReports(
+    { status: queryString(query.status), targetType: queryString(query.targetType) },
+    pagination,
+  )
+
+  sendSuccess(res, items, meta)
+}
+
+export async function resolveReport(req: Request, res: Response) {
+  const body = req.body ?? {}
+  const result = await adminService.resolveReport(req.user!.id, String(req.params.id), {
+    status: body.status,
+    resolutionNote: body.resolutionNote,
+  })
+  sendSuccess(res, result)
+}
