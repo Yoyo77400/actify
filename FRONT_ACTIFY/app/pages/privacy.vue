@@ -146,13 +146,17 @@
       <p class="text-muted text-sm leading-relaxed">
         Conformément au RGPD, vous disposez des droits d'accès, de
         rectification, de portabilité (export de vos données au format JSON) et
-        de suppression de votre compte. Pour les exercer, écrivez-nous à
+        de suppression de votre compte. L'export et la suppression sont
+        disponibles en libre-service depuis
+        <NuxtLink to="/settings/privacy" class="text-accent hover:underline">Paramètres → Privacy</NuxtLink>
+        (protégés par la double authentification si vous l'avez activée). Vous
+        pouvez également modifier vos informations de profil directement depuis
+        l'application. Pour les autres demandes (accès, rectification), écrivez-nous à
         <a href="mailto:yohan.georgelin@gmail.com" class="text-accent hover:underline">yohan.georgelin@gmail.com</a>
         depuis l'adresse associée à votre compte ou en justifiant de votre
-        identité de wallet ; nous répondons dans un délai maximal d'un mois.
-        Vous pouvez également modifier vos informations de profil directement
-        depuis l'application. Si vous estimez que vos droits ne sont pas
-        respectés, vous pouvez saisir la CNIL (cnil.fr).
+        identité de wallet ; nous répondons dans un délai maximal d'un mois. Si
+        vous estimez que vos droits ne sont pas respectés, vous pouvez saisir
+        la CNIL (cnil.fr).
       </p>
     </section>
 

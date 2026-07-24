@@ -20,203 +20,249 @@
         </p>
       </div>
 
-      <!-- ── Step 1: the form ── -->
-      <form v-if="phase === 'form'" class="flex flex-col gap-6" @submit.prevent="onSubmit">
-        <section class="surface p-6 flex flex-col gap-5">
-          <div class="flex flex-col gap-1.5">
-            <label for="title" class="text-foreground text-sm font-medium">
-              Titre <span class="text-danger">*</span>
-            </label>
-            <input
-              id="title"
-              v-model.trim="form.title"
-              type="text"
-              required
-              minlength="3"
-              maxlength="200"
-              placeholder="ex : Pack de textures cyberpunk"
-              class="input"
+      <!-- ── Step 1: the form, as a 3-step wizard ── -->
+      <form v-if="phase === 'form'" class="flex flex-col gap-8" @submit.prevent="onSubmit">
+        <!-- Stepper -->
+        <nav class="flex items-center justify-center py-2" aria-label="Étapes de publication">
+          <template v-for="(s, i) in WIZARD_STEPS" :key="s.key">
+            <button
+              type="button"
+              class="flex items-center gap-2.5"
+              :class="i + 1 > furthestStep ? 'cursor-default' : 'cursor-pointer'"
+              :disabled="i + 1 > furthestStep"
+              :aria-current="i + 1 === currentStep ? 'step' : undefined"
+              @click="goToStep(i + 1)"
             >
-            <p class="text-muted text-xs">3 à 200 caractères.</p>
-          </div>
-
-          <div class="flex flex-col gap-1.5">
-            <label for="shortDescription" class="text-foreground text-sm font-medium">Accroche</label>
-            <input
-              id="shortDescription"
-              v-model.trim="form.shortDescription"
-              type="text"
-              maxlength="200"
-              placeholder="Résumé court affiché sur la carte de l'asset"
-              class="input"
-            >
-          </div>
-
-          <div class="flex flex-col gap-1.5">
-            <label for="description" class="text-foreground text-sm font-medium">Description</label>
-            <textarea
-              id="description"
-              v-model.trim="form.description"
-              rows="4"
-              placeholder="Décrivez le contenu, le format, la licence…"
-              class="input py-3 resize-none"
-              style="min-height: 96px"
+              <span
+                class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border shrink-0 transition-colors"
+                :class="stepDotClass(i + 1)"
+              >
+                <Icon v-if="i + 1 < currentStep" name="ph:check-bold" class="text-sm" />
+                <span v-else>{{ i + 1 }}</span>
+              </span>
+              <span
+                class="text-sm hidden sm:inline transition-colors"
+                :class="i + 1 === currentStep ? 'text-foreground font-medium' : 'text-muted'"
+              >{{ s.label }}</span>
+            </button>
+            <span
+              v-if="i < WIZARD_STEPS.length - 1"
+              class="w-10 sm:w-16 h-px mx-3 shrink-0 transition-colors"
+              :class="i + 1 < currentStep ? 'bg-accent' : 'bg-line'"
             />
-          </div>
+          </template>
+        </nav>
 
-          <div class="flex flex-col gap-2">
-            <span class="text-foreground text-sm font-medium">Catégories</span>
-            <div v-if="categoriesList.length" class="flex flex-wrap gap-2">
-              <button
-                v-for="cat in categoriesList"
-                :key="cat.id"
-                type="button"
-                class="chip text-sm"
-                :class="form.categoryIds.includes(cat.id) ? 'chip--active' : ''"
-                @click="toggleCategory(cat.id)"
-              >
-                {{ cat.name }}
-              </button>
-            </div>
-            <p v-else class="text-muted text-xs">Aucune catégorie disponible.</p>
-          </div>
-        </section>
-
-        <section class="surface p-6 flex flex-col gap-5">
-          <div class="flex flex-col gap-2">
-            <span class="text-foreground text-sm font-medium">Mode de distribution</span>
-            <div class="grid grid-cols-3 max-sm:grid-cols-1 gap-2">
-              <button
-                v-for="mode in DISTRIBUTION_MODES"
-                :key="mode.value"
-                type="button"
-                class="flex flex-col items-start gap-0.5 rounded-xl border px-4 py-3 text-left transition-colors"
-                :class="form.distributionMode === mode.value
-                  ? 'border-accent bg-panel-3 text-foreground'
-                  : 'border-line bg-transparent text-muted hover:border-line-strong'"
-                @click="form.distributionMode = mode.value"
-              >
-                <span class="text-sm font-medium">{{ mode.label }}</span>
-                <span class="text-xs text-muted">{{ mode.hint }}</span>
-              </button>
-            </div>
-          </div>
-
-          <div v-if="form.distributionMode === 'limited'" class="flex flex-col gap-1.5">
-            <label for="maxDownloads" class="text-foreground text-sm font-medium">
-              Téléchargements maximum
-            </label>
-            <input
-              id="maxDownloads"
-              v-model.number="form.maxDownloads"
-              type="number"
-              min="1"
-              step="1"
-              placeholder="ex : 100"
-              class="input"
-            >
-          </div>
-
-          <label class="flex items-center gap-3 cursor-pointer select-none">
-            <input v-model="form.isFree" type="checkbox" class="w-4 h-4 accent-[#2363ff]">
-            <span class="text-foreground text-sm font-medium">Asset gratuit</span>
-          </label>
-
-          <div class="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
-            <div v-if="!form.isFree" class="flex flex-col gap-1.5">
-              <label for="basePrice" class="text-foreground text-sm font-medium">Prix</label>
+        <Transition :name="direction === 'forward' ? 'slide-next' : 'slide-prev'" mode="out-in">
+          <!-- Step 1: Contenu -->
+          <section v-if="currentStep === 1" key="1" class="surface p-8 flex flex-col gap-6">
+            <div class="flex flex-col gap-1.5">
+              <label for="title" class="text-foreground text-sm font-medium">
+                Titre <span class="text-danger">*</span>
+              </label>
               <input
-                id="basePrice"
-                v-model.number="form.basePrice"
-                type="number"
-                min="0"
-                step="0.000001"
-                placeholder="ex : 12.5"
+                id="title"
+                ref="titleInputRef"
+                v-model.trim="form.title"
+                type="text"
+                required
+                minlength="3"
+                maxlength="200"
+                placeholder="ex : Pack de textures cyberpunk"
+                class="input"
+              >
+              <p class="text-muted text-xs">3 à 200 caractères.</p>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label for="shortDescription" class="text-foreground text-sm font-medium">Accroche</label>
+              <input
+                id="shortDescription"
+                v-model.trim="form.shortDescription"
+                type="text"
+                maxlength="200"
+                placeholder="Résumé court affiché sur la carte de l'asset"
                 class="input"
               >
             </div>
 
             <div class="flex flex-col gap-1.5">
-              <span class="text-foreground text-sm font-medium">Devise</span>
-              <div class="input flex items-center gap-2 !bg-panel-3 cursor-not-allowed" aria-readonly="true">
-                <Icon name="ph:currency-circle-dollar" class="text-accent" />
-                <span class="text-foreground text-sm font-medium">XRP</span>
-                <span class="text-muted text-xs ml-auto">réglé en XRP uniquement</span>
+              <label for="description" class="text-foreground text-sm font-medium">Description</label>
+              <textarea
+                id="description"
+                v-model.trim="form.description"
+                rows="4"
+                placeholder="Décrivez le contenu, le format, la licence…"
+                class="input py-3 resize-none"
+                style="min-height: 96px"
+              />
+            </div>
+
+            <div class="flex flex-col gap-2">
+              <span class="text-foreground text-sm font-medium">Catégories</span>
+              <div v-if="categoriesList.length" class="flex flex-wrap gap-2">
+                <button
+                  v-for="cat in categoriesList"
+                  :key="cat.id"
+                  type="button"
+                  class="chip text-sm"
+                  :class="form.categoryIds.includes(cat.id) ? 'chip--active' : ''"
+                  @click="toggleCategory(cat.id)"
+                >
+                  {{ cat.name }}
+                </button>
+              </div>
+              <p v-else class="text-muted text-xs">Aucune catégorie disponible.</p>
+            </div>
+          </section>
+
+          <!-- Step 2: Distribution & prix -->
+          <section v-else-if="currentStep === 2" key="2" class="surface p-8 flex flex-col gap-6">
+            <div class="flex flex-col gap-2">
+              <span class="text-foreground text-sm font-medium">Mode de distribution</span>
+              <div class="grid grid-cols-3 max-sm:grid-cols-1 gap-2">
+                <button
+                  v-for="mode in DISTRIBUTION_MODES"
+                  :key="mode.value"
+                  type="button"
+                  class="flex flex-col items-start gap-0.5 rounded-xl border px-4 py-3 text-left transition-colors"
+                  :class="form.distributionMode === mode.value
+                    ? 'border-accent bg-panel-3 text-foreground'
+                    : 'border-line bg-transparent text-muted hover:border-line-strong'"
+                  @click="form.distributionMode = mode.value"
+                >
+                  <span class="text-sm font-medium">{{ mode.label }}</span>
+                  <span class="text-xs text-muted">{{ mode.hint }}</span>
+                </button>
               </div>
             </div>
-          </div>
 
-          <div class="flex flex-col gap-1.5">
-            <label for="royalty" class="text-foreground text-sm font-medium">Royalties</label>
-            <div class="relative">
+            <div v-if="form.distributionMode === 'limited'" class="flex flex-col gap-1.5">
+              <label for="maxDownloads" class="text-foreground text-sm font-medium">
+                Téléchargements maximum
+              </label>
               <input
-                id="royalty"
-                v-model.number="form.royaltyPercent"
+                id="maxDownloads"
+                v-model.number="form.maxDownloads"
                 type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                placeholder="0"
-                class="input pr-10"
+                min="1"
+                step="1"
+                placeholder="ex : 100"
+                class="input"
               >
-              <span class="absolute right-4 top-1/2 -translate-y-1/2 text-muted text-sm">%</span>
             </div>
-            <p class="text-muted text-xs">Part reversée à chaque revente (0 à 100 %).</p>
-          </div>
-        </section>
 
-        <section class="surface p-6 flex flex-col gap-5">
-          <div class="flex flex-col gap-1.5">
-            <label for="tags" class="text-foreground text-sm font-medium">Tags</label>
-            <input
-              id="tags"
-              v-model.trim="form.tags"
-              type="text"
-              placeholder="cyberpunk, texture, 4k"
-              class="input"
-            >
-            <p class="text-muted text-xs">Séparés par des virgules.</p>
-          </div>
-
-          <div class="flex flex-col gap-1.5">
-            <label for="file" class="text-foreground text-sm font-medium">
-              Fichier de l'asset <span class="text-danger">*</span>
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+              <input v-model="form.isFree" type="checkbox" class="w-4 h-4 accent-[#2363ff]">
+              <span class="text-foreground text-sm font-medium">Asset gratuit</span>
             </label>
-            <input
-              id="file"
-              type="file"
-              class="input file:mr-3 file:rounded-md file:border-0 file:bg-panel-3 file:px-3 file:py-1.5 file:text-foreground"
-              @change="onFilePick"
-            >
-            <p class="text-muted text-xs">
-              {{ fileName ? `Sélectionné : ${fileName}` : 'Le fichier que l\'acheteur téléchargera (50 Mo max).' }}
-            </p>
-          </div>
 
-          <div class="flex flex-col gap-1.5">
-            <label for="thumbnail" class="text-foreground text-sm font-medium">
-              Miniature <span class="text-muted font-normal">(image, optionnel)</span>
-            </label>
-            <input
-              id="thumbnail"
-              type="file"
-              accept="image/*"
-              class="input file:mr-3 file:rounded-md file:border-0 file:bg-panel-3 file:px-3 file:py-1.5 file:text-foreground"
-              @change="onThumbnailPick"
-            >
-            <p class="text-muted text-xs">
-              {{ thumbnailName
-                ? `Sélectionné : ${thumbnailName}`
-                : 'Visuel affiché sur le marketplace. Sans miniature, votre fichier est réutilisé s\'il est une image.' }}
-            </p>
-          </div>
-        </section>
+            <div class="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
+              <div v-if="!form.isFree" class="flex flex-col gap-1.5">
+                <label for="basePrice" class="text-foreground text-sm font-medium">Prix</label>
+                <input
+                  id="basePrice"
+                  v-model.number="form.basePrice"
+                  type="number"
+                  min="0"
+                  step="0.000001"
+                  placeholder="ex : 12.5"
+                  class="input"
+                >
+              </div>
+
+              <div class="flex flex-col gap-1.5">
+                <span class="text-foreground text-sm font-medium">Devise</span>
+                <div class="input flex items-center gap-2 !bg-panel-3 cursor-not-allowed" aria-readonly="true">
+                  <Icon name="ph:currency-circle-dollar" class="text-accent" />
+                  <span class="text-foreground text-sm font-medium">XRP</span>
+                  <span class="text-muted text-xs ml-auto">réglé en XRP uniquement</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label for="royalty" class="text-foreground text-sm font-medium">Royalties</label>
+              <div class="relative">
+                <input
+                  id="royalty"
+                  v-model.number="form.royaltyPercent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  placeholder="0"
+                  class="input pr-10"
+                >
+                <span class="absolute right-4 top-1/2 -translate-y-1/2 text-muted text-sm">%</span>
+              </div>
+              <p class="text-muted text-xs">Part reversée à chaque revente (0 à 100 %).</p>
+            </div>
+          </section>
+
+          <!-- Step 3: Fichiers -->
+          <section v-else key="3" class="surface p-8 flex flex-col gap-6">
+            <div class="flex flex-col gap-1.5">
+              <label for="tags" class="text-foreground text-sm font-medium">Tags</label>
+              <input
+                id="tags"
+                v-model.trim="form.tags"
+                type="text"
+                placeholder="cyberpunk, texture, 4k"
+                class="input"
+              >
+              <p class="text-muted text-xs">Séparés par des virgules.</p>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label for="file" class="text-foreground text-sm font-medium">
+                Fichier de l'asset <span class="text-danger">*</span>
+              </label>
+              <input
+                id="file"
+                type="file"
+                class="input file:mr-3 file:rounded-md file:border-0 file:bg-panel-3 file:px-3 file:py-1.5 file:text-foreground"
+                @change="onFilePick"
+              >
+              <p class="text-muted text-xs">
+                {{ fileName ? `Sélectionné : ${fileName}` : 'Le fichier que l\'acheteur téléchargera (50 Mo max).' }}
+              </p>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label for="thumbnail" class="text-foreground text-sm font-medium">
+                Miniature <span class="text-muted font-normal">(image, optionnel)</span>
+              </label>
+              <input
+                id="thumbnail"
+                type="file"
+                accept="image/*"
+                class="input file:mr-3 file:rounded-md file:border-0 file:bg-panel-3 file:px-3 file:py-1.5 file:text-foreground"
+                @change="onThumbnailPick"
+              >
+              <p class="text-muted text-xs">
+                {{ thumbnailName
+                  ? `Sélectionné : ${thumbnailName}`
+                  : 'Visuel affiché sur le marketplace. Sans miniature, votre fichier est réutilisé s\'il est une image.' }}
+              </p>
+            </div>
+          </section>
+        </Transition>
 
         <p v-if="error" class="text-danger text-sm" role="alert">{{ error }}</p>
 
-        <div class="flex items-center justify-end gap-3">
-          <NuxtLink to="/profile" class="ghost-btn">Annuler</NuxtLink>
-          <button type="submit" class="primary-btn px-6">Créer et publier</button>
+        <div class="flex items-center justify-between gap-3">
+          <NuxtLink v-if="currentStep === 1" to="/profile" class="ghost-btn">Annuler</NuxtLink>
+          <button v-else type="button" class="ghost-btn" @click="prevStep">
+            <Icon name="ph:arrow-left" class="text-base" />
+            Retour
+          </button>
+
+          <button v-if="currentStep < 3" type="button" class="primary-btn px-6" @click="nextStep">
+            Suivant
+            <Icon name="ph:arrow-right" class="text-base" />
+          </button>
+          <button v-else type="submit" class="primary-btn px-6">Créer et publier</button>
         </div>
       </form>
 
@@ -322,6 +368,50 @@ const created = ref<AssetCard | null>(null)
 const tokenized = ref(false)
 const pendingWallet = ref<WalletId | null>(null)
 const error = ref<string | null>(null)
+
+// ── Form wizard (step 1 of the pipeline, split into 3 screens) ──
+// Same fields, same validation rules — only the presentation changes: one
+// section at a time instead of all three stacked. Reusing the title input's
+// native `required`/`minlength` via reportValidity() means the browser shows
+// the exact same validation message it always did, just triggered by
+// "Suivant" instead of the final submit.
+const WIZARD_STEPS = [
+  { key: 'content', label: 'Contenu' },
+  { key: 'pricing', label: 'Distribution & prix' },
+  { key: 'files', label: 'Fichiers' },
+] as const
+
+const currentStep = ref<1 | 2 | 3>(1)
+const furthestStep = ref<1 | 2 | 3>(1)
+const direction = ref<'forward' | 'backward'>('forward')
+const titleInputRef = ref<HTMLInputElement | null>(null)
+
+function stepDotClass(n: number) {
+  if (n < currentStep.value) return 'bg-accent border-accent text-white'
+  if (n === currentStep.value) return 'border-accent text-accent bg-panel-3'
+  return 'border-line text-muted-2 bg-transparent'
+}
+
+function nextStep() {
+  if (currentStep.value === 1 && !titleInputRef.value?.reportValidity()) return
+  error.value = null
+  direction.value = 'forward'
+  currentStep.value = Math.min(3, currentStep.value + 1) as 1 | 2 | 3
+  furthestStep.value = Math.max(furthestStep.value, currentStep.value) as 1 | 2 | 3
+}
+
+function prevStep() {
+  error.value = null
+  direction.value = 'backward'
+  currentStep.value = Math.max(1, currentStep.value - 1) as 1 | 2 | 3
+}
+
+function goToStep(n: number) {
+  if (n < 1 || n > 3 || n > furthestStep.value) return
+  error.value = null
+  direction.value = n > currentStep.value ? 'forward' : 'backward'
+  currentStep.value = n as 1 | 2 | 3
+}
 
 function toggleCategory(id: number) {
   const i = form.categoryIds.indexOf(id)
@@ -457,3 +547,25 @@ async function runPublish() {
   }
 }
 </script>
+
+<style scoped>
+.slide-next-enter-active, .slide-next-leave-active,
+.slide-prev-enter-active, .slide-prev-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.slide-next-enter-from { opacity: 0; transform: translateX(24px); }
+.slide-next-leave-to { opacity: 0; transform: translateX(-24px); }
+.slide-prev-enter-from { opacity: 0; transform: translateX(-24px); }
+.slide-prev-leave-to { opacity: 0; transform: translateX(24px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-next-enter-active, .slide-next-leave-active,
+  .slide-prev-enter-active, .slide-prev-leave-active {
+    transition: opacity 0.15s ease;
+  }
+  .slide-next-enter-from, .slide-next-leave-to,
+  .slide-prev-enter-from, .slide-prev-leave-to {
+    transform: none;
+  }
+}
+</style>

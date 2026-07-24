@@ -14,6 +14,9 @@ import { searchRouter } from './search.routes'
 import { statsRouter } from './stats.routes'
 import { creatorRouter } from './creator.routes'
 import { adminRouter } from './admin.routes'
+import { reportsRouter } from './reports.routes'
+import { notificationsRouter } from './notifications.routes'
+import { consentsRouter } from './consents.routes'
 
 export const v1Router = Router()
 
@@ -49,3 +52,6 @@ v1Router.use('/search', searchRouter)
 v1Router.use('/stats', statsRouter)
 v1Router.use('/creator', creatorRouter)
 v1Router.use('/admin', adminRouter)
+v1Router.use('/reports', reportsRouter)
+v1Router.use('/notifications', notificationsRouter)
+v1Router.use('/consents', consentsRouter)

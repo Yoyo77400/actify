@@ -6,6 +6,7 @@ vi.mock('../services/prisma', () => ({
     listing: { findFirst: vi.fn() },
     purchase: { count: vi.fn(), create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     wallet: { findFirst: vi.fn() },
+    notification: { create: vi.fn() },
   },
 }))
 
@@ -31,6 +32,7 @@ const purchaseFindFirst = vi.mocked(prisma.purchase.findFirst)
 const purchaseFindMany = vi.mocked(prisma.purchase.findMany)
 const purchaseUpdateMany = vi.mocked(prisma.purchase.updateMany)
 const walletFindFirst = vi.mocked(prisma.wallet.findFirst)
+const notificationCreate = vi.mocked(prisma.notification.create)
 const verifyPayment = vi.mocked(verifyXrplPayment)
 
 const BUYER_ID = 'buyer-1'
@@ -315,6 +317,10 @@ describe('confirmOrder', () => {
     expect(order).toMatchObject({ id: 'order-1', status: 'Confirmed', txHash: NORMALIZED_TX_HASH })
     // The seller's current wallet must NOT be re-resolved: the snapshot is used.
     expect(walletFindFirst).not.toHaveBeenCalled()
+    // The seller is notified of the sale.
+    expect(notificationCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ userId: SELLER_ID, type: 'order:confirmed' }),
+    })
   })
 
   it('rejects a missing txHash', async () => {

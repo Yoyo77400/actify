@@ -8,9 +8,9 @@ export const usersRouter = Router()
 // swallowed by the dynamic param route.
 usersRouter.get('/me', requireAuth, usersController.getMe)
 usersRouter.put('/me', requireAuth, usersController.updateMe)
-// Action sensible : 2FA requise.
+// Actions sensibles : 2FA requise.
 usersRouter.delete('/me', requireAuth, requireTotp, usersController.deleteMe)
-usersRouter.get('/me/data-export', requireAuth, usersController.exportMyData)
+usersRouter.get('/me/data-export', requireAuth, requireTotp, usersController.exportMyData)
 
 usersRouter.get('/:username', usersController.getPublicProfile)
 usersRouter.get('/:username/assets', usersController.listUserAssets)

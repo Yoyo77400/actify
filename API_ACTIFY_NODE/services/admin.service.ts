@@ -9,6 +9,8 @@ const ADMIN_ROLE = 'admin'
 // placeholder in tx_hash until a real payment confirms them.
 const PENDING_TX_PREFIX = 'pending:'
 const ASSET_STATUSES = ['Draft', 'Published', 'Archived', 'Suspended']
+const REPORT_PENDING = 'Pending'
+const REPORT_RESOLVE_STATUSES = ['Resolved', 'Rejected']
 
 const SELLER_SELECT = { select: { id: true, username: true, displayName: true } } as const
 
@@ -25,6 +27,16 @@ export interface AdminUserFilters {
 
 export interface AdminOrderFilters {
   status?: string
+}
+
+export interface AdminReportFilters {
+  status?: string
+  targetType?: string
+}
+
+export interface ResolveReportInput {
+  status?: unknown
+  resolutionNote?: unknown
 }
 
 function serializeAdminAsset(listing: {
@@ -282,4 +294,82 @@ export async function getAdminStats() {
     totalOrders,
     confirmedRevenue: Number(revenue._sum.amountPaid ?? 0),
   }
+}
+
+function serializeAdminReport(report: {
+  id: string
+  targetType: string
+  targetId: string
+  reason: string
+  details: string | null
+  status: string
+  resolutionNote: string | null
+  resolvedAt: Date | null
+  createdAt: Date
+  reporter: { id: string; username: string | null; displayName: string | null }
+  resolvedBy: { id: string; username: string | null; displayName: string | null } | null
+}) {
+  return {
+    id: report.id,
+    targetType: report.targetType,
+    targetId: report.targetId,
+    reason: report.reason,
+    details: report.details,
+    status: report.status,
+    resolutionNote: report.resolutionNote,
+    resolvedAt: report.resolvedAt,
+    createdAt: report.createdAt,
+    reporter: report.reporter,
+    resolvedBy: report.resolvedBy,
+  }
+}
+
+export async function listReports(filters: AdminReportFilters, pagination: Pagination) {
+  const where: Record<string, unknown> = {}
+  if (filters.status) where.status = filters.status
+  if (filters.targetType) where.targetType = filters.targetType
+
+  const [items, total] = await Promise.all([
+    prisma.report.findMany({
+      where,
+      include: { reporter: SELLER_SELECT, resolvedBy: SELLER_SELECT },
+      orderBy: { createdAt: 'desc' },
+      skip: pagination.skip,
+      take: pagination.limit,
+    }),
+    prisma.report.count({ where }),
+  ])
+
+  return { items: items.map(serializeAdminReport), meta: buildMeta(pagination.page, pagination.limit, total) }
+}
+
+export async function resolveReport(adminId: string, reportId: string, input: ResolveReportInput) {
+  if (typeof input.status !== 'string' || !REPORT_RESOLVE_STATUSES.includes(input.status)) {
+    throw new AppError(400, 'VALIDATION_ERROR', `status doit être l'un de : ${REPORT_RESOLVE_STATUSES.join(', ')}`)
+  }
+  const resolutionNote = input.resolutionNote
+  if (resolutionNote !== undefined && resolutionNote !== null && typeof resolutionNote !== 'string') {
+    throw new AppError(400, 'VALIDATION_ERROR', 'resolutionNote doit être une chaîne de caractères')
+  }
+
+  const report = await prisma.report.findUnique({ where: { id: reportId } })
+  if (!report) {
+    throw new AppError(404, 'NOT_FOUND', 'Signalement introuvable')
+  }
+  if (report.status !== REPORT_PENDING) {
+    throw new AppError(409, 'REPORT_ALREADY_RESOLVED', 'Ce signalement a déjà été traité')
+  }
+
+  const updated = await prisma.report.update({
+    where: { id: reportId },
+    data: {
+      status: input.status,
+      resolutionNote: (resolutionNote as string | undefined) ?? null,
+      resolvedById: adminId,
+      resolvedAt: new Date(),
+    },
+    include: { reporter: SELLER_SELECT, resolvedBy: SELLER_SELECT },
+  })
+
+  return serializeAdminReport(updated)
 }
