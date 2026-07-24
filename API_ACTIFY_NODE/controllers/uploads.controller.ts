@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import { AppError, sendSuccess } from '../utils/http'
-import { resolveStoredPath } from '../services/storage'
+import { resolveStoredPath, sniffImageMime } from '../services/storage'
 import * as uploadsService from '../services/uploads.service'
 
 function requireUploadedFile(req: Request) {
@@ -29,6 +29,20 @@ export function serveFile(req: Request, res: Response) {
   const path = resolveStoredPath(String(req.params.key))
   if (!path) {
     throw new AppError(404, 'NOT_FOUND', 'Fichier introuvable')
+  }
+
+  // Never trust the stored extension for what the browser does with the
+  // bytes: sniff the real content. A verified raster image renders inline
+  // (thumbnails); anything else — including a file mislabeled .png that's
+  // actually HTML/SVG/script — is forced to download as an opaque blob so it
+  // can never execute. Upload itself stays unrestricted; this only governs
+  // how this one public route hands bytes back to a browser.
+  const mime = sniffImageMime(path)
+  if (mime) {
+    res.type(mime)
+  } else {
+    res.setHeader('Content-Type', 'application/octet-stream')
+    res.setHeader('Content-Disposition', 'attachment')
   }
   res.sendFile(path)
 }
