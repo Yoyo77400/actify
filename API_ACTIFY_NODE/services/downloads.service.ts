@@ -1,31 +1,26 @@
 import { extname } from 'node:path'
 import jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
+import { resolveEntitlement } from './entitlements.service'
 import { AppError, buildMeta } from '../utils/http'
 import type { Pagination } from '../utils/pagination'
 
 const PUBLISHED = 'Published'
-const PURCHASE_CONFIRMED = 'Confirmed'
 const DOWNLOAD_TOKEN_TTL = '1h'
 const DOWNLOAD_TOKEN_TTL_MS = 60 * 60 * 1000
 
 const HISTORY_LISTING_SELECT = { id: true, slug: true, title: true, thumbnailCid: true } as const
 
 // Throws unless `userId` is an active (non-banned) user entitled to download
-// `listing` right now: free asset, or a confirmed purchase. Shared by the
-// request and resolve paths so a token can't outlive the entitlement.
+// `listing` right now: free asset, confirmed purchase, or the asset's NFToken
+// held on-chain. Shared by the request and resolve paths so a token can't
+// outlive the entitlement.
 async function assertEntitled(userId: string, listing: { id: string; isFree: boolean }) {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user || user.deletedAt || user.isBanned) {
     throw new AppError(403, 'FORBIDDEN', 'Compte non autorisé')
   }
-  if (listing.isFree) {
-    return
-  }
-  const purchase = await prisma.purchase.findFirst({
-    where: { buyerId: userId, listingId: listing.id, status: PURCHASE_CONFIRMED },
-  })
-  if (!purchase) {
+  if (!(await resolveEntitlement(userId, listing))) {
     throw new AppError(403, 'LICENSE_NOT_FOUND', 'Aucune licence valide pour cet asset')
   }
 }
@@ -47,11 +42,19 @@ export async function requestDownload(userId: string, listingId: string) {
   // maxDownloads is a global cap on how many distinct buyers can download
   // (limited distribution), NOT a per-token quota: a buyer who already has a
   // download row re-requests freely, only new downloaders consume the cap.
-  if (listing.maxDownloads != null) {
+  //
+  // The seller is outside that population on both counts — as requester and in
+  // the tally. They own the file, and since they keep the NFToken they minted
+  // they now resolve as entitled: counting them would let a creator fetching
+  // their own asset burn a slot a buyer has already paid for (orders caps
+  // CONFIRMED PURCHASES against the same number, so the sale still goes
+  // through and only the download would 410).
+  const isSeller = userId === listing.sellerId
+  if (listing.maxDownloads != null && !isSeller) {
     const alreadyDownloaded = await prisma.download.findFirst({ where: { userId, listingId: listing.id } })
     if (!alreadyDownloaded) {
       const distinctDownloaders = await prisma.download.findMany({
-        where: { listingId: listing.id },
+        where: { listingId: listing.id, userId: { not: listing.sellerId } },
         distinct: ['userId'],
         select: { userId: true },
       })

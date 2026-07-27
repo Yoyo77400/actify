@@ -9,8 +9,8 @@ export async function getMe(req: Request, res: Response) {
 }
 
 export async function updateMe(req: Request, res: Response) {
-  const { username, displayName, bio, avatarCid } = req.body ?? {}
-  const me = await usersService.updateMe(req.user!.id, { username, displayName, bio, avatarCid })
+  const { username, displayName, bio, avatarCid, bannerCid } = req.body ?? {}
+  const me = await usersService.updateMe(req.user!.id, { username, displayName, bio, avatarCid, bannerCid })
   sendSuccess(res, me)
 }
 

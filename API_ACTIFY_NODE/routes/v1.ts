@@ -5,6 +5,7 @@ import { usersRouter } from './users.routes'
 import { walletsRouter } from './wallets.routes'
 import { assetsRouter } from './assets.routes'
 import { categoriesRouter } from './categories.routes'
+import { collectionsRouter } from './collections.routes'
 import { reviewsRouter, assetReviewsRouter } from './reviews.routes'
 import { assetFavoritesRouter, meFavoritesRouter } from './favorites.routes'
 import { ordersRouter } from './orders.routes'
@@ -44,6 +45,7 @@ v1Router.use('/users', usersRouter)
 
 v1Router.use('/wallets', walletsRouter)
 v1Router.use('/categories', categoriesRouter)
+v1Router.use('/collections', collectionsRouter)
 v1Router.use('/reviews', reviewsRouter)
 v1Router.use('/orders', ordersRouter)
 v1Router.use('/downloads', downloadsRouter)

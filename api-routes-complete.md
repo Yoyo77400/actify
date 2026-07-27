@@ -10,7 +10,7 @@
 | Assets (CRUD + publish/unpublish + filtres) | ✅ Implémenté |
 | Catégories, Reviews, Favoris | ✅ Implémenté |
 | Orders (+ vérification paiement on-chain XRPL Testnet) | ✅ Implémenté |
-| Downloads (token signé 1h → redirect IPFS) | ✅ Implémenté |
+| Downloads (token signé 1h → stream du fichier) | ✅ Implémenté |
 | Recherche, Stats publiques, Stats créateur | ✅ Implémenté |
 | Admin (assets, users, orders, stats, reports) | ✅ Implémenté |
 | TOTP (2FA), Mint NFT, Rate limiting | ✅ Implémenté |
@@ -344,15 +344,31 @@ Le wallet est l'unique moyen de connexion : `challenge` + `verify` font office d
 > \* Le token est signé et a une expiration courte (1h). Pas besoin d'auth header, le token fait office de preuve.
 
 **Flow complet :**
-1. `POST /downloads/:assetId/request` → vérifie l'authentification (wallet) + licence on-chain + validité
-2. Retourne `{ "downloadToken": "...", "expiresAt": "...", "version": "2.0.0" }`
-3. `GET /downloads/token/:token` → déchiffre le fichier, applique watermark si configuré, stream le fichier
+1. `POST /downloads/:assetId/request` → vérifie le compte (actif, non banni) + l'**entitlement** + le cap de distribution
+2. Retourne `{ "downloadToken": "...", "expiresAt": "..." }`
+3. `GET /downloads/token/:token` → **revérifie l'entitlement sur l'état courant** (un token ne survit pas à la perte du droit qu'il représente), puis stream le fichier en pièce jointe
 
-**Query params optionnels sur `/downloads/:assetId/request` :**
+### Entitlement — qui a le droit de télécharger
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `versionId` | uuid | Version spécifique (défaut: latest autorisée) |
+Trois chemins, évalués du moins cher au plus cher (`services/entitlements.service.ts`) :
+
+| Raison | Condition |
+|---|---|
+| `free` | l'asset est gratuit (`isFree`) — aucune requête supplémentaire |
+| `purchase` | une `Purchase` au statut `Confirmed` lie l'acheteur à l'asset |
+| `nft_owner` | un des wallets liés du compte **détient le NFToken de l'asset sur le ledger** (`account_nfts`) |
+
+Le chemin `nft_owner` couvre les licences acquises hors marketplace (revente, transfert direct) : c'est le ledger qui fait foi, pas la base. Il échoue **fermé** — un nœud XRPL injoignable ne vaut jamais preuve de possession.
+
+Sans aucun de ces trois chemins : `403 LICENSE_NOT_FOUND`.
+
+`GET /assets/:idOrSlug` renvoie le même verdict au visiteur connecté, pour que le front sache s'il doit proposer le bouton sans avoir à provoquer un 403 :
+
+```json
+"viewerEntitlement": { "canDownload": true, "reason": "nft_owner" }
+```
+
+`reason` vaut `null` et `canDownload` `false` pour un visiteur anonyme, un asset non publié ou un asset sans fichier attaché — c'est-à-dire exactement les cas où `/downloads/:assetId/request` refuserait.
 
 ---
 

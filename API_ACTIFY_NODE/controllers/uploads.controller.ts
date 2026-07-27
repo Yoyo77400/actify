@@ -22,6 +22,20 @@ export async function uploadThumbnail(req: Request, res: Response) {
   sendSuccess(res, result, undefined, 201)
 }
 
+// Profile images. No ownership lookup needed: the target is always the
+// authenticated caller's own row, never an id taken from the request.
+export async function uploadAvatar(req: Request, res: Response) {
+  const file = requireUploadedFile(req)
+  const result = await uploadsService.setUserAvatar(req.user!.id, file.filename)
+  sendSuccess(res, result, undefined, 201)
+}
+
+export async function uploadBanner(req: Request, res: Response) {
+  const file = requireUploadedFile(req)
+  const result = await uploadsService.setUserBanner(req.user!.id, file.filename)
+  sendSuccess(res, result, undefined, 201)
+}
+
 // Public raw-file serving (thumbnails and other display images). The main
 // asset file's key is never exposed to clients, so it can't be fetched here —
 // it is only delivered through the entitlement-checked download-token flow.

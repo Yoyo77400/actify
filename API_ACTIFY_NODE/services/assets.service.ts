@@ -1,7 +1,9 @@
 import { prisma } from './prisma'
+import { resolveEntitlement } from './entitlements.service'
 import { AppError, buildMeta } from '../utils/http'
 import type { Pagination } from '../utils/pagination'
 import { slugify } from '../utils/slug'
+import { assertAssignableCollection } from './collections.service'
 
 const DRAFT = 'Draft'
 const PUBLISHED = 'Published'
@@ -23,6 +25,7 @@ export interface CreateAssetInput {
   shortDescription?: string | null
   tags?: string[]
   categoryIds?: number[]
+  collectionId?: number | null
   distributionMode?: string
   maxDownloads?: number | null
   isFree?: boolean
@@ -217,6 +220,12 @@ export async function updateAsset(userId: string, listingId: string, input: Upda
   if (input.shortDescription !== undefined) data.shortDescription = input.shortDescription
   if (input.description !== undefined) data.description = input.description
 
+  // Guarded in the collections service: attaching an asset to someone else's
+  // collection would let anyone inject listings into it.
+  if (input.collectionId !== undefined) {
+    data.collectionId = await assertAssignableCollection(userId, input.collectionId)
+  }
+
   if (input.distributionMode !== undefined) {
     validateDistributionMode(input.distributionMode)
     data.distributionMode = input.distributionMode
@@ -311,10 +320,20 @@ export async function getAssetByIdOrSlug(idOrSlug: string, viewerUserId: string 
     _count: { _all: true },
   })
 
+  // Tells the viewer whether the download button applies to them, so the UI
+  // never has to probe /downloads and read a 403 to find out. Resolved under
+  // the exact conditions the download endpoint enforces (Published + a file
+  // attached), otherwise the button would offer something that 404s.
+  const isDownloadable = listing.status === PUBLISHED && listing.fileIpfsCid != null
+  const reason = viewerUserId != null && isDownloadable
+    ? await resolveEntitlement(viewerUserId, listing)
+    : null
+
   return {
     ...serializeListing(listing),
     averageRating: rating._avg.rating != null ? Number(rating._avg.rating.toFixed(2)) : null,
     reviewsCount: rating._count._all,
+    viewerEntitlement: { canDownload: reason != null, reason },
   }
 }
 

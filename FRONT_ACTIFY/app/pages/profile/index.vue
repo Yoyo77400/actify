@@ -1,20 +1,31 @@
 <template>
   <div v-if="view" class="flex flex-col gap-7">
-    <ProfileHeader :user="view" />
+    <ProfileHeader :user="view" @edit="editing = true" />
+    <ProfileEditModal v-model="editing" />
 
     <div class="grid grid-cols-[1fr_300px] max-xl:grid-cols-1 gap-[18px]">
       <div class="flex flex-col gap-7">
+        <ProfileCollections />
+
         <section>
-          <CommonSectionHeader title="My Collections" subtitle="Your created and owned collections" />
-          <div v-if="view.collections.length" class="grid grid-cols-2 max-md:grid-cols-1 gap-4">
-            <ProfileCollectionCard
-              v-for="col in view.collections"
-              :key="col.id"
-              :collection="col"
-            />
+          <CommonSectionHeader title="Mes assets" subtitle="Vos créations publiées et vos brouillons" />
+
+          <p v-if="listingsError" class="surface p-8 text-center text-danger text-sm" role="alert">
+            Impossible de charger vos assets pour le moment.
+          </p>
+          <div v-else-if="listings.length" class="grid grid-cols-2 max-md:grid-cols-1 gap-4">
+            <!-- Owner view: unlike the public catalogue this also returns
+                 drafts, so each card carries its status. -->
+            <div v-for="item in listings" :key="item.id" class="relative">
+              <span
+                v-if="item.status !== 'Published'"
+                class="pill-badge absolute top-3 left-3 z-10 bg-panel-3/90"
+              >{{ item.status === 'Draft' ? 'Brouillon' : item.status }}</span>
+              <ArtistAssetCard :item="item" />
+            </div>
           </div>
           <div v-else class="surface p-8 text-center">
-            <p class="text-muted text-sm">Aucune collection pour le moment.</p>
+            <p class="text-muted text-sm">Aucun asset pour le moment.</p>
             <NuxtLink to="/asset/new" class="text-accent text-sm hover:underline">Publier un premier asset</NuxtLink>
           </div>
         </section>
@@ -51,6 +62,22 @@ definePageMeta({ middleware: 'auth' })
 useHead({ title: 'Mon profil' })
 
 const { user } = useAuth()
+const assets = useAssets()
+
+const editing = ref(false)
+
+// The owner's own listings — /creator/listings is scoped server-side to the
+// caller (sellerId) and, unlike the public catalogue, includes drafts.
+// Refetched after an edit so a freshly published asset shows up.
+const { data: listingsData, error: listingsError, refresh: refreshListings } = await useAsyncData(
+  'profile-listings',
+  () => assets.myListings(),
+)
+const listings = computed(() => listingsData.value ?? [])
+
+watch(editing, (open) => {
+  if (!open) refreshListings()
+})
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
@@ -67,10 +94,11 @@ const view = computed<UserProfile | null>(() => {
   return {
     displayName: me.displayName ?? me.username ?? 'Utilisateur Actify',
     username: me.username ? `@${me.username}` : (primary ? shortAddress(primary.address) : ''),
-    avatar: me.avatarCid
-      ? `https://ipfs.io/ipfs/${me.avatarCid}`
-      : `https://picsum.photos/seed/${me.id}/200/200`,
-    cover: 'https://images.unsplash.com/photo-1473116763249-2faaef81ccda?auto=format&fit=crop&w=1800&q=80',
+    // Both served by the API's /files/:key, with a deterministic local tile as
+    // fallback — the old ipfs.io URL never resolved (storage is API-local) and
+    // the cover was a hardcoded stock photo.
+    avatar: avatarImage(me.avatarCid, me.id),
+    cover: bannerImage(me.bannerCid, me.id),
     bio: me.bio ?? '',
     joinedAt: new Date(me.createdAt).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
     followersCount: 0,

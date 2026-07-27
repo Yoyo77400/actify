@@ -1,9 +1,10 @@
 import { prisma } from './prisma'
 import { AppError, buildMeta } from '../utils/http'
 import type { Pagination } from '../utils/pagination'
+import { searchCollections } from './collections.service'
 
 const PUBLISHED = 'Published'
-const SEARCH_TYPES = ['assets', 'creators', 'all']
+const SEARCH_TYPES = ['assets', 'creators', 'collections', 'all']
 const SUGGESTION_LIMIT = 5
 
 const ASSET_CARD_INCLUDE = {
@@ -130,15 +131,24 @@ export async function search(filters: SearchFilters, pagination: Pagination) {
     throw new AppError(400, 'VALIDATION_ERROR', `type doit être l'un de : ${SEARCH_TYPES.join(', ')}`)
   }
 
-  const [assets, creators] = await Promise.all([
-    type === 'creators' ? null : searchAssets(q, pagination),
-    type === 'assets' ? null : searchCreators(q, pagination),
+  const [assets, creators, collections] = await Promise.all([
+    type === 'all' || type === 'assets' ? searchAssets(q, pagination) : null,
+    type === 'all' || type === 'creators' ? searchCreators(q, pagination) : null,
+    type === 'all' || type === 'collections' ? searchCollections(q, pagination) : null,
   ])
 
-  const meta = type === 'assets' ? assets?.meta : type === 'creators' ? creators?.meta : undefined
+  const meta = type === 'assets'
+    ? assets?.meta
+    : type === 'creators'
+      ? creators?.meta
+      : type === 'collections' ? collections?.meta : undefined
 
   return {
-    results: { assets: assets?.items ?? [], creators: creators?.items ?? [] },
+    results: {
+      assets: assets?.items ?? [],
+      creators: creators?.items ?? [],
+      collections: collections?.items ?? [],
+    },
     meta,
   }
 }
@@ -149,7 +159,7 @@ export async function getSuggestions(q: string | undefined) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Le paramètre q est requis')
   }
 
-  const [titleRows, tagRows, userRows] = await Promise.all([
+  const [titleRows, tagRows, userRows, collectionRows] = await Promise.all([
     prisma.listing.findMany({
       where: { status: PUBLISHED, deletedAt: null, title: { contains: term, mode: 'insensitive' } },
       select: { title: true },
@@ -168,11 +178,18 @@ export async function getSuggestions(q: string | undefined) {
       orderBy: { username: 'asc' },
       take: SUGGESTION_LIMIT,
     }),
+    prisma.collection.findMany({
+      where: { name: { contains: term, mode: 'insensitive' } },
+      select: { name: true },
+      orderBy: { name: 'asc' },
+      take: SUGGESTION_LIMIT,
+    }),
   ])
 
   return {
     titles: titleRows.map((row) => row.title),
     tags: tagRows.map((row) => row.name),
     usernames: userRows.map((row) => row.username).filter((username): username is string => username !== null),
+    collections: collectionRows.map((row) => row.name),
   }
 }

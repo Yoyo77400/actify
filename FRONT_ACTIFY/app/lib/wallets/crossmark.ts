@@ -1,5 +1,18 @@
 import sdk from '@crossmarkio/sdk'
-import { WalletRejectedError, utf8ToHex, type MintNftParams, type WalletAdapter } from './types'
+import {
+  WalletRejectedError,
+  utf8ToHex,
+  type MintNftParams,
+  type SendPaymentParams,
+  type WalletAdapter,
+} from './types'
+
+// signAndSubmitAndWait nests the ledger response differently across Crossmark
+// versions; both shapes carry the hash we need.
+function extractTxHash(data: unknown): string | undefined {
+  const resp = (data as { resp?: { result?: { hash?: string }; hash?: string } } | undefined)?.resp
+  return resp?.result?.hash ?? resp?.hash
+}
 
 export const crossmarkAdapter: WalletAdapter = {
   id: 'crossmark',
@@ -37,7 +50,7 @@ export const crossmarkAdapter: WalletAdapter = {
 
   async mintNft(params: MintNftParams) {
     // The backend re-derives the NFTokenID from the on-chain tx, so only the
-    // hash matters here; its nesting under resp varies across Crossmark docs.
+    // hash matters here.
     const { response } = await sdk.async.signAndSubmitAndWait({
       TransactionType: 'NFTokenMint',
       Account: params.account,
@@ -46,10 +59,30 @@ export const crossmarkAdapter: WalletAdapter = {
       Flags: params.flags,
       TransferFee: params.transferFee,
     })
-    const resp = (response?.data as { resp?: { result?: { hash?: string }, hash?: string } } | undefined)?.resp
-    const txHash = resp?.result?.hash ?? resp?.hash
+    const txHash = extractTxHash(response?.data)
     if (!txHash) {
       throw new WalletRejectedError()
+    }
+    return { txHash }
+  },
+
+  async sendPayment(params: SendPaymentParams) {
+    const { response } = await sdk.async.signAndSubmitAndWait({
+      TransactionType: 'Payment',
+      Account: params.account,
+      Destination: params.destination,
+      DestinationTag: params.destinationTag,
+      Amount: params.amountDrops,
+    })
+    const txHash = extractTxHash(response?.data)
+    if (!txHash) {
+      // Deliberately not "refusé": signAndSubmitAndWait may well have submitted
+      // the Payment and only failed to surface its hash here. Claiming a refusal
+      // would invite the buyer to pay a second time.
+      throw new WalletRejectedError(
+        'Crossmark n\'a pas renvoyé de hash de transaction. Vérifiez dans votre wallet si le paiement est parti '
+        + 'AVANT de réessayer — s\'il est parti, collez son hash via "Payer depuis un autre wallet".',
+      )
     }
     return { txHash }
   },

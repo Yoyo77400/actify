@@ -28,6 +28,7 @@ model User {
   email       String?   @unique
   bio         String?
   avatarCid   String?   @map("avatar_cid")
+  bannerCid   String?   @map("banner_cid")
   isVerified  Boolean   @default(false) @map("is_verified")
   isBanned    Boolean   @default(false) @map("is_banned")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -53,6 +54,7 @@ model User {
   resolvedReports  Report[]       @relation("ReportResolver")
   notifications    Notification[]
   consents         Consent[]
+  collections      Collection[]
 
   @@map("users")
 }
@@ -106,8 +108,15 @@ model Collection {
   name     String
   slug     String    @unique
   img      String?
+  // Nullable : les collections antérieures à cette colonne n'ont pas de
+  // propriétaire, et l'effacement RGPD d'un compte la remet à null plutôt que
+  // de supprimer une collection contenant les assets publiés d'autrui.
+  ownerId  String?   @map("owner_id")
+
+  owner    User?     @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   listings Listing[]
 
+  @@index([ownerId])
   @@map("collections")
 }
 
