@@ -176,17 +176,38 @@
               Le wallet vous montre la transaction avant signature. Actify n'a jamais accès à vos fonds.
             </p>
 
-            <!-- Fallback: a payment whose confirmation was lost (reload, tab closed)
-                 has no other way back — the signed hash only lives in memory. -->
-            <details v-if="order" class="group">
+            <!-- Always reachable, and deliberately not gated on an existing order:
+                 the wallet buttons above are dead without a desktop extension, so
+                 this is the only way to buy from a phone, Xaman or an exchange —
+                 and the only way back for a payment whose confirmation was lost. -->
+            <details class="group">
               <summary
                 class="list-none cursor-pointer text-muted text-xs hover:text-foreground inline-flex items-center gap-1"
               >
                 <Icon name="ph:caret-right" class="text-sm transition-transform group-open:rotate-90" />
-                Payer manuellement / j'ai déjà payé
+                Payer depuis un autre wallet / j'ai déjà payé
               </summary>
 
-              <div class="mt-3 flex flex-col gap-3">
+              <div v-if="!order" class="mt-3 flex flex-col gap-3">
+                <p class="text-muted text-xs leading-relaxed">
+                  Réglez depuis n'importe quel wallet XRP : générez les coordonnées, envoyez le montant
+                  avec le DestinationTag exact, puis collez le hash de la transaction.
+                </p>
+                <button
+                  type="button"
+                  class="ghost-btn w-full"
+                  :disabled="creatingOrder"
+                  @click="createOrderForManualPayment"
+                >
+                  <span v-if="!creatingOrder">Obtenir les coordonnées de paiement</span>
+                  <span v-else class="flex items-center justify-center gap-2">
+                    <span class="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    Création…
+                  </span>
+                </button>
+              </div>
+
+              <div v-else class="mt-3 flex flex-col gap-3">
                 <div class="rounded-xl border border-line bg-panel-3 p-4 flex flex-col gap-3">
                   <div>
                     <p class="text-muted text-xs uppercase tracking-widest">Montant à envoyer</p>
@@ -478,6 +499,26 @@ async function buyAndPay(walletId: WalletId) {
   } finally {
     syncAlreadySigned()
     payingWith.value = null
+  }
+}
+
+// Same order creation as buyAndPay, minus the wallet. The XRPL is open: the
+// buyer can settle from anything that speaks Payment, they just need the
+// address and the DestinationTag — which only exist once the order does.
+const creatingOrder = ref(false)
+async function createOrderForManualPayment() {
+  const a = asset.value
+  if (!a || order.value || creatingOrder.value) return
+
+  creatingOrder.value = true
+  payError.value = null
+  try {
+    order.value = await orders.create(a.id)
+  } catch (err) {
+    payError.value = toApiError(err)?.message
+      ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'La commande n\'a pas pu être créée.')
+  } finally {
+    creatingOrder.value = false
   }
 }
 
