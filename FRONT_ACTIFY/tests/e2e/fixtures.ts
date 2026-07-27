@@ -1,21 +1,38 @@
 import { test as base, expect, type Page } from '@playwright/test'
-import { E2E_USER } from './accounts'
+import { WALLET_POOLS, type E2eAccount } from './accounts'
 
 /**
  * Base test extended so every page has a test wallet wired in.
  *
  * `addInitScript` sets window.__ACTIFY_E2E_WALLET__ before any app code runs;
  * getWalletAdapter() then returns the in-page signer instead of the real
- * Crossmark/GemWallet extension (see app/lib/wallets/e2e.ts). Override the seed
- * per file/test with `test.use({ walletSeed: E2E_ADMIN.seed })`.
+ * Crossmark/GemWallet extension (see app/lib/wallets/e2e.ts). Pick the pool per
+ * file with `test.use({ walletPool: WALLET_POOLS.signup })`, or force a raw seed
+ * with `test.use({ walletSeed: '' })` to simulate having no wallet at all.
  */
-export const test = base.extend<{ walletSeed: string }>({
-  walletSeed: [E2E_USER.seed, { option: true }],
+export const test = base.extend<{
+  // The pool is named, not passed by value: Playwright reads an array given to
+  // test.use() as a [value, options] tuple and would silently hand the fixture
+  // just its first element.
+  walletPool: keyof typeof WALLET_POOLS
+  wallet: E2eAccount
+  walletSeed: string | null
+}>({
+  walletPool: ['auth', { option: true }],
+  walletSeed: [null, { option: true }],
 
-  page: async ({ page, walletSeed }, use) => {
+  // A retry must not inherit the account its failed attempt created, so each
+  // attempt takes the next wallet in the pool. Beyond the pool the last one is
+  // reused — that only happens past the configured retry count.
+  wallet: async ({ walletPool }, use, testInfo) => {
+    const pool = WALLET_POOLS[walletPool]
+    await use(pool[Math.min(testInfo.retry, pool.length - 1)]!)
+  },
+
+  page: async ({ page, wallet, walletSeed }, use) => {
     await page.addInitScript((seed) => {
       ;(window as unknown as { __ACTIFY_E2E_WALLET__?: { seed: string } }).__ACTIFY_E2E_WALLET__ = { seed }
-    }, walletSeed)
+    }, walletSeed ?? wallet.seed)
     // Answer the cookie banner up front: it is fixed to the bottom of every
     // page and swallows clicks aimed at the content behind it. 'rejected' keeps
     // the Umami plugin from injecting its external script.
@@ -48,6 +65,19 @@ export async function clearSession(page: Page) {
 export async function gotoPrivacySettings(page: Page) {
   await page.goto('/settings/privacy')
   await expect(page.getByRole('button', { name: /Autoriser|Refuser/ }).first()).toBeVisible()
+}
+
+/**
+ * Opens /settings/security and waits until it is hydrated — same swallowed-click
+ * hazard as above, but this page has no visual tell: its markup is identical
+ * before and after hydration. Its onMounted calls fetchMe(), so the browser
+ * issuing GET /users/me is the proof that client-side code is running. The
+ * listener is armed before navigating, otherwise a fast response is missed.
+ */
+export async function gotoSecuritySettings(page: Page) {
+  const hydrated = page.waitForResponse(res => res.url().includes('/users/me'))
+  await page.goto('/settings/security')
+  await hydrated
 }
 
 export { expect }

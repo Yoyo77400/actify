@@ -1,8 +1,7 @@
-import { test, expect, walletLogin, registerNewAccount, clearSession } from './fixtures'
-import { E2E_TOTP } from './accounts'
+import { test, expect, walletLogin, registerNewAccount, clearSession, gotoSecuritySettings } from './fixtures'
 import { generateTotp } from './totp'
 
-test.use({ walletSeed: E2E_TOTP.seed })
+test.use({ walletPool: 'totp' })
 
 // The 6-digit code space is only 1e6 wide and there is no account lockout, so
 // /auth/verify-2fa is only brute-force-proof as long as its rate limiter stays
@@ -18,7 +17,7 @@ test.describe('totpLoginStepUp', () => {
     await registerNewAccount(page, 'e2e_totp')
 
     // ── Enroll 2FA, acting as the user's authenticator app ──
-    await page.goto('/settings/security')
+    await gotoSecuritySettings(page)
     await page.getByRole('button', { name: /Activer la 2FA/i }).click()
 
     const secret = (await page.locator('code').first().innerText()).trim()

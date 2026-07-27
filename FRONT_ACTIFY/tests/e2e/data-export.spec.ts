@@ -1,14 +1,13 @@
 import { test, expect, registerNewAccount, gotoPrivacySettings } from './fixtures'
-import { E2E_EXPORT } from './accounts'
 import { readFile } from 'node:fs/promises'
 
-test.use({ walletSeed: E2E_EXPORT.seed })
+test.use({ walletPool: 'export' })
 
 // GDPR portability: the export route sits behind requireTotp, which must stay a
 // no-op for accounts that never enrolled 2FA. It regressed into a hard 403 once
 // already — a legal obligation silently failing for most users.
 test.describe('gdprDataExport', () => {
-  test('exportsAccountDataWithout2faEnrolled', async ({ page }) => {
+  test('exportsAccountDataWithout2faEnrolled', async ({ page, wallet }) => {
     await registerNewAccount(page, 'e2e_export')
 
     await gotoPrivacySettings(page)
@@ -27,6 +26,6 @@ test.describe('gdprDataExport', () => {
     const path = await download.path()
     const payload = JSON.parse(await readFile(path, 'utf8'))
     expect(JSON.stringify(payload)).toContain('e2e_export')
-    expect(JSON.stringify(payload)).toContain(E2E_EXPORT.address)
+    expect(JSON.stringify(payload)).toContain(wallet.address)
   })
 })

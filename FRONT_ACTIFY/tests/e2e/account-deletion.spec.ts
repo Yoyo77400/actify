@@ -1,7 +1,6 @@
 import { test, expect, walletLogin, registerNewAccount, gotoPrivacySettings } from './fixtures'
-import { E2E_DELETE } from './accounts'
 
-test.use({ walletSeed: E2E_DELETE.seed })
+test.use({ walletPool: 'delete' })
 
 // GDPR erasure, and the most destructive action in the app: the wallet is the
 // only way in, so deleting is unrecoverable. Both halves matter — the guard must
