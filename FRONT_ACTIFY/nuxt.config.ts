@@ -5,6 +5,13 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['@/assets/styles/main.css'],
+  app: {
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/actify-circle.png' },
+      ],
+    },
+  },
   // Prod: transparent proxy of the whole backend namespace to the internal
   // service. Versioning (v1, v2…) is the backend's call — the proxy never needs
   // to change. Works because Nuxt's own server endpoints live outside /api
