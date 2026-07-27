@@ -423,6 +423,9 @@ function truncateMiddle(value: string, head = 10, tail = 8): string {
 // says so on the detail payload — the button only mirrors that verdict.
 const canDownload = computed(() => asset.value?.viewerEntitlement.canDownload === true)
 const entitlement = computed(() => {
+  // The seller holds the NFToken they minted, so the API answers 'nft_owner'
+  // for them — accurate, but odd wording on your own asset.
+  if (isOwner.value) return { icon: 'ph:user-circle', label: 'Votre asset — accès à votre fichier source.' }
   const reason = asset.value?.viewerEntitlement.reason
   return reason ? ENTITLEMENT_LABELS[reason] : ENTITLEMENT_LABELS.free
 })

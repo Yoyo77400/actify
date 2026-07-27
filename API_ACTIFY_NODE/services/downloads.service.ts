@@ -42,11 +42,19 @@ export async function requestDownload(userId: string, listingId: string) {
   // maxDownloads is a global cap on how many distinct buyers can download
   // (limited distribution), NOT a per-token quota: a buyer who already has a
   // download row re-requests freely, only new downloaders consume the cap.
-  if (listing.maxDownloads != null) {
+  //
+  // The seller is outside that population on both counts — as requester and in
+  // the tally. They own the file, and since they keep the NFToken they minted
+  // they now resolve as entitled: counting them would let a creator fetching
+  // their own asset burn a slot a buyer has already paid for (orders caps
+  // CONFIRMED PURCHASES against the same number, so the sale still goes
+  // through and only the download would 410).
+  const isSeller = userId === listing.sellerId
+  if (listing.maxDownloads != null && !isSeller) {
     const alreadyDownloaded = await prisma.download.findFirst({ where: { userId, listingId: listing.id } })
     if (!alreadyDownloaded) {
       const distinctDownloaders = await prisma.download.findMany({
-        where: { listingId: listing.id },
+        where: { listingId: listing.id, userId: { not: listing.sellerId } },
         distinct: ['userId'],
         select: { userId: true },
       })
