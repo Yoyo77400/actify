@@ -12,10 +12,12 @@
     >
       <NuxtLink
         to="/"
-        class="block w-[34px] h-[34px] rounded-full bg-[#f2ff00] shadow-[0_0_20px_rgba(242,255,0,0.35)] shrink-0"
+        class="block w-[34px] h-[34px] rounded-full overflow-hidden shrink-0"
         aria-label="Actify home"
         @click.stop
-      />
+      >
+        <img src="/actify-circle.png" alt="" class="w-full h-full object-cover">
+      </NuxtLink>
       <span
         v-show="isExpanded"
         class="ethnocentric text-foreground text-lg font-bold whitespace-nowrap"

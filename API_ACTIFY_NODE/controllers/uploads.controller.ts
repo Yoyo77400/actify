@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
+import { unlink } from 'node:fs/promises'
 import { AppError, sendSuccess } from '../utils/http'
-import { resolveStoredPath, sniffImageMime } from '../services/storage'
+import { compressThumbnail, resolveStoredPath, sniffImageMime } from '../services/storage'
 import * as uploadsService from '../services/uploads.service'
 
 function requireUploadedFile(req: Request) {
@@ -18,6 +19,12 @@ export async function uploadFile(req: Request, res: Response) {
 
 export async function uploadThumbnail(req: Request, res: Response) {
   const file = requireUploadedFile(req)
+  try {
+    await compressThumbnail(file.path)
+  } catch {
+    await unlink(file.path).catch(() => {})
+    throw new AppError(400, 'VALIDATION_ERROR', 'Image de miniature invalide ou illisible')
+  }
   const result = await uploadsService.setAssetThumbnail(req.user!.id, String(req.params.id), file.filename)
   sendSuccess(res, result, undefined, 201)
 }
