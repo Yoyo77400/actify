@@ -9,7 +9,7 @@
     "dev": "tsx watch index.ts",
     "start": "node dist/index.js",
     "build": "prisma generate && tsc",
-    "test:e2e:server": "prisma generate && tsx tests/e2e/bootstrap.ts"
+    "test:e2e:server": "prisma generate && tsx tests/e2e-harness/bootstrap.ts"
   },
   "author": "",
   "license": "ISC",
