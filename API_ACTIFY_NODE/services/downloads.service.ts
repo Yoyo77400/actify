@@ -1,31 +1,26 @@
 import { extname } from 'node:path'
 import jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
+import { resolveEntitlement } from './entitlements.service'
 import { AppError, buildMeta } from '../utils/http'
 import type { Pagination } from '../utils/pagination'
 
 const PUBLISHED = 'Published'
-const PURCHASE_CONFIRMED = 'Confirmed'
 const DOWNLOAD_TOKEN_TTL = '1h'
 const DOWNLOAD_TOKEN_TTL_MS = 60 * 60 * 1000
 
 const HISTORY_LISTING_SELECT = { id: true, slug: true, title: true, thumbnailCid: true } as const
 
 // Throws unless `userId` is an active (non-banned) user entitled to download
-// `listing` right now: free asset, or a confirmed purchase. Shared by the
-// request and resolve paths so a token can't outlive the entitlement.
+// `listing` right now: free asset, confirmed purchase, or the asset's NFToken
+// held on-chain. Shared by the request and resolve paths so a token can't
+// outlive the entitlement.
 async function assertEntitled(userId: string, listing: { id: string; isFree: boolean }) {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user || user.deletedAt || user.isBanned) {
     throw new AppError(403, 'FORBIDDEN', 'Compte non autorisé')
   }
-  if (listing.isFree) {
-    return
-  }
-  const purchase = await prisma.purchase.findFirst({
-    where: { buyerId: userId, listingId: listing.id, status: PURCHASE_CONFIRMED },
-  })
-  if (!purchase) {
+  if (!(await resolveEntitlement(userId, listing))) {
     throw new AppError(403, 'LICENSE_NOT_FOUND', 'Aucune licence valide pour cet asset')
   }
 }

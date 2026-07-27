@@ -16,6 +16,16 @@ export interface MintNftParams {
   transferFee: number
 }
 
+// Parameters for the XRP Payment settling one order. `destinationTag` is what
+// binds the payment to that order server-side, and `amountDrops` is integer
+// drops (1 XRP = 1e6) — never a float, this is real money.
+export interface SendPaymentParams {
+  account: string
+  destination: string
+  destinationTag: number
+  amountDrops: string
+}
+
 export interface WalletAdapter {
   id: WalletId
   label: string
@@ -33,6 +43,8 @@ export interface WalletAdapter {
   signMessage(message: string): Promise<string>
   /** Signs + submits an NFTokenMint; returns the resulting tx hash. */
   mintNft(params: MintNftParams): Promise<{ txHash: string }>
+  /** Signs + submits an XRP Payment; returns the resulting tx hash. */
+  sendPayment(params: SendPaymentParams): Promise<{ txHash: string }>
 }
 
 // tfTransferable = 8: the marketplace/royalty flag Actify always mints with.

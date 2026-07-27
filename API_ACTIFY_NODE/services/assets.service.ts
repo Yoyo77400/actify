@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { resolveEntitlement } from './entitlements.service'
 import { AppError, buildMeta } from '../utils/http'
 import type { Pagination } from '../utils/pagination'
 import { slugify } from '../utils/slug'
@@ -311,10 +312,20 @@ export async function getAssetByIdOrSlug(idOrSlug: string, viewerUserId: string 
     _count: { _all: true },
   })
 
+  // Tells the viewer whether the download button applies to them, so the UI
+  // never has to probe /downloads and read a 403 to find out. Resolved under
+  // the exact conditions the download endpoint enforces (Published + a file
+  // attached), otherwise the button would offer something that 404s.
+  const isDownloadable = listing.status === PUBLISHED && listing.fileIpfsCid != null
+  const reason = viewerUserId != null && isDownloadable
+    ? await resolveEntitlement(viewerUserId, listing)
+    : null
+
   return {
     ...serializeListing(listing),
     averageRating: rating._avg.rating != null ? Number(rating._avg.rating.toFixed(2)) : null,
     reviewsCount: rating._count._all,
+    viewerEntitlement: { canDownload: reason != null, reason },
   }
 }
 

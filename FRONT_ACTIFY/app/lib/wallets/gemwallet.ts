@@ -1,5 +1,11 @@
-import { getPublicKey, isInstalled, mintNFT, signMessage } from '@gemwallet/api'
-import { flagsToGemwallet, WalletRejectedError, type MintNftParams, type WalletAdapter } from './types'
+import { getPublicKey, isInstalled, mintNFT, sendPayment, signMessage } from '@gemwallet/api'
+import {
+  flagsToGemwallet,
+  WalletRejectedError,
+  type MintNftParams,
+  type SendPaymentParams,
+  type WalletAdapter,
+} from './types'
 
 export const gemwalletAdapter: WalletAdapter = {
   id: 'gemwallet',
@@ -41,6 +47,21 @@ export const gemwalletAdapter: WalletAdapter = {
     })
     if (res.type !== 'response' || !res.result?.hash) {
       throw new WalletRejectedError()
+    }
+    return { txHash: res.result.hash }
+  },
+
+  async sendPayment(params: SendPaymentParams) {
+    // GemWallet pays from the account currently selected in the extension, so
+    // params.account is informational here — the popup shows the payer.
+    // A bare string amount is drops (an object would be an issued currency).
+    const res = await sendPayment({
+      amount: params.amountDrops,
+      destination: params.destination,
+      destinationTag: params.destinationTag,
+    })
+    if (res.type !== 'response' || !res.result?.hash) {
+      throw new WalletRejectedError('Paiement refusé dans GemWallet')
     }
     return { txHash: res.result.hash }
   },

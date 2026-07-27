@@ -32,4 +32,4 @@ export async function getWalletAdapter(id: WalletId): Promise<WalletAdapter> {
 }
 
 export { WalletRejectedError } from './types'
-export type { WalletAdapter, WalletConnection, WalletId } from './types'
+export type { SendPaymentParams, WalletAdapter, WalletConnection, WalletId } from './types'

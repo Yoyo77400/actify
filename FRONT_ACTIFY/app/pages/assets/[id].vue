@@ -93,144 +93,175 @@
 
       <!-- Aside column -->
       <aside class="flex flex-col gap-[18px]">
-        <!-- Buy panel -->
+        <!-- Buy / download panel -->
         <div class="surface p-5 flex flex-col gap-4">
           <div>
             <p class="text-muted text-xs uppercase tracking-widest">Prix</p>
             <p class="ethnocentric text-foreground text-2xl mt-1">{{ priceLabel }}</p>
           </div>
 
-          <!-- Order created -> payment instructions and ledger confirmation -->
-          <div v-if="order" class="flex flex-col gap-3">
-            <div v-if="confirmedTxHash" class="flex flex-col gap-3">
-              <div class="flex items-center gap-2 text-success text-sm">
-                <Icon name="ph:check-circle" class="text-lg shrink-0" />
-                <span>Paiement confirmé. L'asset est maintenant disponible dans vos achats.</span>
-              </div>
-              <p class="text-muted-2 text-xs font-mono break-all">{{ confirmedTxHash }}</p>
-            </div>
-
-            <div v-else class="flex items-center gap-2 text-success text-sm">
-              <Icon name="ph:check-circle" class="text-lg shrink-0" />
-              <span>Commande créée — en attente de paiement.</span>
-            </div>
-
-            <div v-if="!confirmedTxHash" class="rounded-xl border border-line bg-panel-3 p-4 flex flex-col gap-3">
-              <div>
-                <p class="text-muted text-xs uppercase tracking-widest">Montant à envoyer</p>
-                <p class="text-foreground text-lg font-mono mt-1">{{ order.amount }} {{ order.currency }}</p>
-              </div>
-
-              <div>
-                <p class="text-muted text-xs uppercase tracking-widest mb-1">Adresse de paiement</p>
-                <div class="flex items-center gap-2">
-                  <span class="text-foreground text-xs font-mono break-all min-w-0 flex-1" :title="order.paymentAddress">
-                    {{ order.paymentAddress }}
-                  </span>
-                  <button
-                    type="button"
-                    class="ghost-btn !min-h-8 px-2 shrink-0"
-                    :aria-label="`Copier l'adresse`"
-                    @click="copy(order.paymentAddress, 'address')"
-                  >
-                    <Icon :name="copied === 'address' ? 'ph:check' : 'ph:copy'" class="text-base" />
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p class="text-muted text-xs uppercase tracking-widest mb-1">DestinationTag</p>
-                <div class="flex items-center gap-2">
-                  <span class="text-foreground text-base font-mono">{{ order.paymentTag }}</span>
-                  <button
-                    type="button"
-                    class="ghost-btn !min-h-8 px-2 shrink-0"
-                    aria-label="Copier le DestinationTag"
-                    @click="copy(String(order.paymentTag), 'tag')"
-                  >
-                    <Icon :name="copied === 'tag' ? 'ph:check' : 'ph:copy'" class="text-base" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <p v-if="!confirmedTxHash" class="text-warning text-xs leading-relaxed flex gap-2">
-              <Icon name="ph:warning" class="text-sm shrink-0 mt-0.5" />
-              <span>Envoyez le paiement avec ce DestinationTag exact, sinon la commande ne pourra pas être confirmée.</span>
+          <!-- Entitled: the file is the deliverable, it wins over everything else -->
+          <template v-if="canDownload">
+            <p class="text-success text-sm flex items-center gap-2">
+              <Icon :name="entitlement.icon" class="text-base shrink-0" />
+              {{ entitlement.label }}
             </p>
 
-            <form v-if="!confirmedTxHash" class="flex flex-col gap-2" @submit.prevent="confirmPayment">
-              <label for="payment-tx-hash" class="text-muted text-xs uppercase tracking-widest">
-                Hash de transaction XRPL
-              </label>
-              <input
-                id="payment-tx-hash"
-                v-model.trim="txHash"
-                class="input font-mono"
-                type="text"
-                inputmode="text"
-                maxlength="64"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="64 caractères hexadécimaux"
-              >
-              <button
-                type="submit"
-                class="primary-btn w-full"
-                :disabled="confirming || !isTxHashValid"
-              >
-                <span v-if="!confirming">Confirmer le paiement</span>
-                <span v-else class="flex items-center justify-center gap-2">
-                  <span class="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Vérification…
-                </span>
-              </button>
-              <p v-if="confirmError" class="text-danger text-xs" role="alert">{{ confirmError }}</p>
-            </form>
-
-            <p v-if="!confirmedTxHash" class="text-muted-2 text-xs">
-              Expire le {{ new Date(order.expiresAt).toLocaleString('fr-FR') }}.
-            </p>
-          </div>
-
-          <!-- No order yet -->
-          <template v-else>
-            <p v-if="asset.isFree" class="text-muted text-sm flex items-center gap-2">
-              <Icon name="ph:download-simple" class="text-base text-success shrink-0" />
-              Téléchargement gratuit — aucun paiement requis.
-            </p>
-
-            <NuxtLink
-              v-else-if="!isLoggedIn"
-              to="/auth/login"
-              class="primary-btn w-full"
-            >Se connecter pour acheter</NuxtLink>
-
-            <template v-else-if="isOwner">
-              <button type="button" class="primary-btn w-full" disabled>Acheter</button>
-              <p class="text-muted-2 text-xs text-center">Vous êtes le vendeur de cet asset.</p>
-            </template>
-
-            <button
-              v-else
-              type="button"
-              class="primary-btn w-full"
-              :disabled="ordering"
-              @click="buy"
-            >
-              <span v-if="!ordering">Acheter</span>
+            <button type="button" class="primary-btn w-full" :disabled="downloading" @click="download">
+              <span v-if="!downloading" class="flex items-center justify-center gap-2">
+                <Icon name="ph:download-simple" class="text-base" />
+                Télécharger
+              </span>
               <span v-else class="flex items-center justify-center gap-2">
                 <span class="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                Création…
+                Préparation…
               </span>
             </button>
 
-            <p v-if="orderError" class="text-danger text-xs" role="alert">{{ orderError }}</p>
-            <NuxtLink
-              v-if="orderErrorCode === 'WALLET_NOT_LINKED'"
-              to="/settings/wallet"
-              class="text-accent text-xs hover:underline"
-            >Lier un wallet XRP →</NuxtLink>
+            <p v-if="downloadError" class="text-danger text-xs" role="alert">{{ downloadError }}</p>
+            <p v-if="confirmedTxHash" class="text-muted-2 text-xs font-mono break-all">
+              Paiement confirmé · {{ confirmedTxHash }}
+            </p>
+          </template>
+
+          <!-- Paid and settled, but the reload that unlocks the file didn't land -->
+          <template v-else-if="confirmedTxHash">
+            <p class="text-success text-sm flex items-center gap-2">
+              <Icon name="ph:check-circle" class="text-lg shrink-0" />
+              Paiement confirmé — la licence est à vous.
+            </p>
+            <p class="text-muted-2 text-xs font-mono break-all">{{ confirmedTxHash }}</p>
+            <button type="button" class="primary-btn w-full" @click="refresh()">Afficher le téléchargement</button>
+          </template>
+
+          <NuxtLink v-else-if="!isLoggedIn" to="/auth/login" class="primary-btn w-full">
+            {{ asset.isFree ? 'Se connecter pour télécharger' : 'Se connecter pour acheter' }}
+          </NuxtLink>
+
+          <!-- Free, signed in: the only ways here are "no file yet" and "not published" -->
+          <p v-else-if="asset.isFree" class="text-muted text-sm flex items-center gap-2">
+            <Icon name="ph:file-dashed" class="text-base shrink-0" />
+            {{ asset.hasFile
+              ? 'Téléchargeable une fois l\'asset publié.'
+              : 'Aucun fichier n\'est encore attaché à cet asset.' }}
+          </p>
+
+          <template v-else-if="isOwner">
+            <button type="button" class="primary-btn w-full" disabled>Acheter</button>
+            <p class="text-muted-2 text-xs text-center">Vous êtes le vendeur de cet asset.</p>
+          </template>
+
+          <!-- Paid: order + wallet payment in a single gesture -->
+          <template v-else>
+            <p v-if="order" class="text-success text-sm flex items-center gap-2">
+              <Icon name="ph:check-circle" class="text-lg shrink-0" />
+              Commande créée — en attente de paiement.
+            </p>
+
+            <p v-if="alreadySigned" class="text-warning text-xs leading-relaxed flex gap-2" role="alert">
+              <Icon name="ph:warning" class="text-sm shrink-0 mt-0.5" />
+              <span>Paiement déjà signé dans votre wallet : relancez pour relire le ledger, ne payez pas deux fois.</span>
+            </p>
+
+            <div>
+              <p class="text-muted text-xs uppercase tracking-widest mb-2">
+                {{ alreadySigned ? 'Reprendre la vérification avec' : `Payer ${priceLabel} avec` }}
+              </p>
+              <AuthWalletPicker :pending="payingWith" :step="payStep" @select="buyAndPay" />
+            </div>
+
+            <p v-if="payError" class="text-danger text-xs" role="alert">{{ payError }}</p>
+
+            <p class="text-muted-2 text-xs">
+              Le wallet vous montre la transaction avant signature. Actify n'a jamais accès à vos fonds.
+            </p>
+
+            <!-- Fallback: a payment whose confirmation was lost (reload, tab closed)
+                 has no other way back — the signed hash only lives in memory. -->
+            <details v-if="order" class="group">
+              <summary
+                class="list-none cursor-pointer text-muted text-xs hover:text-foreground inline-flex items-center gap-1"
+              >
+                <Icon name="ph:caret-right" class="text-sm transition-transform group-open:rotate-90" />
+                Payer manuellement / j'ai déjà payé
+              </summary>
+
+              <div class="mt-3 flex flex-col gap-3">
+                <div class="rounded-xl border border-line bg-panel-3 p-4 flex flex-col gap-3">
+                  <div>
+                    <p class="text-muted text-xs uppercase tracking-widest">Montant à envoyer</p>
+                    <p class="text-foreground text-lg font-mono mt-1">{{ order.amount }} {{ order.currency }}</p>
+                  </div>
+
+                  <div>
+                    <p class="text-muted text-xs uppercase tracking-widest mb-1">Adresse de paiement</p>
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="text-foreground text-xs font-mono break-all min-w-0 flex-1"
+                        :title="order.paymentAddress"
+                      >{{ order.paymentAddress }}</span>
+                      <button
+                        type="button"
+                        class="ghost-btn !min-h-8 px-2 shrink-0"
+                        :aria-label="`Copier l'adresse`"
+                        @click="copy(order.paymentAddress, 'address')"
+                      >
+                        <Icon :name="copied === 'address' ? 'ph:check' : 'ph:copy'" class="text-base" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p class="text-muted text-xs uppercase tracking-widest mb-1">DestinationTag</p>
+                    <div class="flex items-center gap-2">
+                      <span class="text-foreground text-base font-mono">{{ order.paymentTag }}</span>
+                      <button
+                        type="button"
+                        class="ghost-btn !min-h-8 px-2 shrink-0"
+                        aria-label="Copier le DestinationTag"
+                        @click="copy(String(order.paymentTag), 'tag')"
+                      >
+                        <Icon :name="copied === 'tag' ? 'ph:check' : 'ph:copy'" class="text-base" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <p class="text-warning text-xs leading-relaxed flex gap-2">
+                  <Icon name="ph:warning" class="text-sm shrink-0 mt-0.5" />
+                  <span>Envoyez le paiement avec ce DestinationTag exact, sinon la commande ne pourra pas être confirmée.</span>
+                </p>
+
+                <form class="flex flex-col gap-2" @submit.prevent="confirmPayment">
+                  <label for="payment-tx-hash" class="text-muted text-xs uppercase tracking-widest">
+                    Hash de transaction XRPL
+                  </label>
+                  <input
+                    id="payment-tx-hash"
+                    v-model.trim="txHash"
+                    class="input font-mono"
+                    type="text"
+                    inputmode="text"
+                    maxlength="64"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="64 caractères hexadécimaux"
+                  >
+                  <button type="submit" class="ghost-btn w-full" :disabled="confirming || !isTxHashValid">
+                    <span v-if="!confirming">Confirmer le paiement</span>
+                    <span v-else class="flex items-center justify-center gap-2">
+                      <span class="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                      Vérification…
+                    </span>
+                  </button>
+                  <p v-if="confirmError" class="text-danger text-xs" role="alert">{{ confirmError }}</p>
+                </form>
+
+                <p class="text-muted-2 text-xs">
+                  Expire le {{ new Date(order.expiresAt).toLocaleString('fr-FR') }}.
+                </p>
+              </div>
+            </details>
           </template>
         </div>
 
@@ -273,11 +304,19 @@
 </template>
 
 <script setup lang="ts">
-import type { AssetDetail, OrderCreated } from '~/types/asset'
+import { WalletRejectedError, type WalletId } from '~/lib/wallets'
+import type { AssetDetail, EntitlementReason, OrderCreated } from '~/types/asset'
 
 interface LoadFailure {
   notFound: boolean
   message: string
+}
+
+// Why the viewer already has access, in the words that make sense on this page.
+const ENTITLEMENT_LABELS: Record<EntitlementReason, { icon: string; label: string }> = {
+  free: { icon: 'ph:download-simple', label: 'Téléchargement gratuit — aucun paiement requis.' },
+  purchase: { icon: 'ph:seal-check', label: 'Licence acquise — cet asset est à vous.' },
+  nft_owner: { icon: 'ph:wallet', label: 'NFT détenu dans votre wallet — accès débloqué.' },
 }
 
 type LoadResult =
@@ -287,13 +326,17 @@ type LoadResult =
 const route = useRoute()
 const assets = useAssets()
 const orders = useOrders()
+const downloads = useDownloads()
+const { step: payStep, pay, hasSignedPayment, forgetSignedPayment } = usePayOrder()
 const { user, isLoggedIn } = useAuth()
 
 const assetId = String(route.params.id)
 
 // The API throws on error; normalize inside the handler so `toApiError` runs on
 // the raw FetchError (Nuxt would otherwise wrap it and break `instanceof`).
-const { data, refresh } = await useAsyncData<LoadResult>(`asset:${assetId}`, async () => {
+// Keyed by viewer: the payload carries viewerEntitlement, so signing in must
+// not be served the anonymous verdict from cache.
+const { data, refresh } = await useAsyncData<LoadResult>(`asset:${user.value?.id ?? 'guest'}:${assetId}`, async () => {
   try {
     return { ok: true, asset: await assets.get(assetId) }
   } catch (err) {
@@ -354,6 +397,33 @@ function truncateMiddle(value: string, head = 10, tail = 8): string {
   return `${value.slice(0, head)}…${value.slice(-tail)}`
 }
 
+// ─── Download ───
+// The API resolves the entitlement (free / purchased / NFT held on-chain) and
+// says so on the detail payload — the button only mirrors that verdict.
+const canDownload = computed(() => asset.value?.viewerEntitlement.canDownload === true)
+const entitlement = computed(() => {
+  const reason = asset.value?.viewerEntitlement.reason
+  return reason ? ENTITLEMENT_LABELS[reason] : ENTITLEMENT_LABELS.free
+})
+
+const downloading = ref(false)
+const downloadError = ref<string | null>(null)
+
+async function download() {
+  const a = asset.value
+  if (!a) return
+  downloading.value = true
+  downloadError.value = null
+  try {
+    await downloads.download(a.id)
+  } catch (err) {
+    downloadError.value = toApiError(err)?.message
+      ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'Le téléchargement n\'a pas pu démarrer.')
+  } finally {
+    downloading.value = false
+  }
+}
+
 // ─── Buy flow ───
 const { data: recoveredOrder } = await useAsyncData<OrderCreated | null>(
   `pending-order:${user.value?.id ?? 'guest'}:${assetId}`,
@@ -365,30 +435,49 @@ const { data: recoveredOrder } = await useAsyncData<OrderCreated | null>(
 )
 
 const order = ref<OrderCreated | null>(recoveredOrder.value ?? null)
-const ordering = ref(false)
-const orderError = ref<string | null>(null)
-const orderErrorCode = ref<string | null>(null)
+const payingWith = ref<WalletId | null>(null)
+const payError = ref<string | null>(null)
+// The signed-but-unconfirmed hash lives in browser storage, unreadable during
+// SSR — mirror it on mount and after each attempt, so the warning can render
+// without a hydration mismatch.
+const alreadySigned = ref(false)
+function syncAlreadySigned() {
+  alreadySigned.value = !!order.value && hasSignedPayment(order.value.id)
+}
+onMounted(syncAlreadySigned)
 const txHash = ref('')
 const confirming = ref(false)
 const confirmError = ref<string | null>(null)
 const confirmedTxHash = ref<string | null>(null)
 const isTxHashValid = computed(() => /^[0-9a-fA-F]{64}$/.test(txHash.value))
 
-async function buy() {
+/**
+ * One gesture for the buyer, three steps underneath: create the order (it
+ * carries the DestinationTag the payment must quote), have the wallet sign and
+ * submit the XRP Payment, then let the backend verify it on the ledger.
+ */
+async function buyAndPay(walletId: WalletId) {
   const a = asset.value
-  if (!a) return
-  ordering.value = true
-  orderError.value = null
-  orderErrorCode.value = null
+  if (!a || payingWith.value) return
+
+  payingWith.value = walletId
+  payError.value = null
   try {
-    order.value = await orders.create(a.id)
+    const pendingOrder = order.value ?? await orders.create(a.id)
+    order.value = pendingOrder
+
+    const confirmation = await pay(pendingOrder, walletId)
+    pendingOrder.status = confirmation.status
+    confirmedTxHash.value = confirmation.txHash
+    await refresh()
   } catch (err) {
-    const apiErr = toApiError(err)
-    orderErrorCode.value = apiErr?.code ?? null
-    orderError.value = apiErr?.message
-      ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'La commande n\'a pas pu être créée.')
+    payError.value = err instanceof WalletRejectedError
+      ? err.message
+      : toApiError(err)?.message
+      ?? (isNetworkError(err) ? 'Connexion au serveur impossible.' : 'Le paiement n\'a pas pu être finalisé.')
   } finally {
-    ordering.value = false
+    syncAlreadySigned()
+    payingWith.value = null
   }
 }
 
@@ -402,6 +491,9 @@ async function confirmPayment() {
     const confirmed = await orders.confirm(pendingOrder.id, txHash.value)
     pendingOrder.status = confirmed.status
     confirmedTxHash.value = confirmed.txHash
+    // Settled by hand: the wallet resume point is now dead weight.
+    forgetSignedPayment(pendingOrder.id)
+    syncAlreadySigned()
     await refresh()
   } catch (err) {
     const apiErr = toApiError(err)
