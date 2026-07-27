@@ -76,7 +76,13 @@ export const crossmarkAdapter: WalletAdapter = {
     })
     const txHash = extractTxHash(response?.data)
     if (!txHash) {
-      throw new WalletRejectedError('Paiement refusé dans Crossmark')
+      // Deliberately not "refusé": signAndSubmitAndWait may well have submitted
+      // the Payment and only failed to surface its hash here. Claiming a refusal
+      // would invite the buyer to pay a second time.
+      throw new WalletRejectedError(
+        'Crossmark n\'a pas renvoyé de hash de transaction. Vérifiez dans votre wallet si le paiement est parti '
+        + 'AVANT de réessayer — s\'il est parti, collez son hash via "Payer depuis un autre wallet".',
+      )
     }
     return { txHash }
   },

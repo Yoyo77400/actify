@@ -12,7 +12,11 @@ vi.mock('../services/prisma', () => ({
   },
 }))
 
+// The ledger lookup has its own suite (xrpl-nft.test.ts); here it is a switch.
+vi.mock('../services/chains/xrpl-nft', () => ({ accountOwnsNft: vi.fn() }))
+
 import { prisma } from '../services/prisma'
+import { accountOwnsNft } from '../services/chains/xrpl-nft'
 import { listMyDownloads, requestDownload, resolveDownloadFile } from '../services/downloads.service'
 
 const userFindUnique = vi.mocked(prisma.user.findUnique)
@@ -23,13 +27,22 @@ const downloadFindMany = vi.mocked(prisma.download.findMany)
 const downloadCreate = vi.mocked(prisma.download.create)
 const downloadCount = vi.mocked(prisma.download.count)
 const nftFindUnique = vi.mocked(prisma.nft.findUnique)
+const walletFindMany = vi.mocked(prisma.wallet.findMany)
+const ownsNft = vi.mocked(accountOwnsNft)
 
 const JWT_SECRET = process.env.JWT_SECRET!
 const ONE_HOUR_MS = 60 * 60 * 1000
 const CLOCK_TOLERANCE_MS = 2000
 
 const activeUser = { id: 'user-1', deletedAt: null, isBanned: false }
-const freeListing = { id: 'listing-1', isFree: true, maxDownloads: null, fileIpfsCid: 'QmCid' }
+const SELLER_ID = 'seller-1'
+const freeListing = {
+  id: 'listing-1',
+  isFree: true,
+  maxDownloads: null,
+  fileIpfsCid: 'QmCid',
+  sellerId: SELLER_ID,
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -134,6 +147,41 @@ describe('requestDownload', () => {
 
     const { downloadToken } = await requestDownload('user-1', 'listing-1')
     expect(jwt.verify(downloadToken, JWT_SECRET)).toMatchObject({ type: 'download' })
+  })
+
+  // The seller holds the NFToken they minted, so they now resolve as entitled.
+  // They must not eat into the buyers' quota — neither by being refused, nor by
+  // leaving a download row that counts against it.
+  it('lets the seller download their own capped asset even when the cap is full', async () => {
+    userFindUnique.mockResolvedValue({ ...activeUser, id: SELLER_ID } as never)
+    listingFindFirst.mockResolvedValue({ ...freeListing, isFree: false, maxDownloads: 1 } as never)
+    purchaseFindFirst.mockResolvedValue(null)
+    nftFindUnique.mockResolvedValue({ nftokenId: 'NFT-1' } as never)
+    walletFindMany.mockResolvedValue([{ address: 'rSeller' }] as never)
+    ownsNft.mockResolvedValue(true)
+    downloadCreate.mockResolvedValue({} as never)
+
+    const { downloadToken } = await requestDownload(SELLER_ID, 'listing-1')
+
+    expect(jwt.verify(downloadToken, JWT_SECRET)).toMatchObject({ type: 'download' })
+    // Cap never evaluated for the seller.
+    expect(downloadFindMany).not.toHaveBeenCalled()
+  })
+
+  it('excludes the seller from the distinct-downloader tally', async () => {
+    userFindUnique.mockResolvedValue(activeUser as never)
+    listingFindFirst.mockResolvedValue({ ...freeListing, maxDownloads: 2 } as never)
+    downloadFindFirst.mockResolvedValue(null)
+    downloadFindMany.mockResolvedValue([{ userId: 'a' }] as never)
+    downloadCreate.mockResolvedValue({} as never)
+
+    await requestDownload('user-1', 'listing-1')
+
+    expect(downloadFindMany).toHaveBeenCalledWith({
+      where: { listingId: 'listing-1', userId: { not: SELLER_ID } },
+      distinct: ['userId'],
+      select: { userId: true },
+    })
   })
 
   it('rejects with 404 when the listing has no attached file', async () => {

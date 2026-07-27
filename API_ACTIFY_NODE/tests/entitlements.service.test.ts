@@ -63,6 +63,24 @@ describe('resolveEntitlement', () => {
     expect(ownsNft).toHaveBeenCalledTimes(2)
   })
 
+  // The detail route has no rate limiter, so the number of ledger calls one
+  // page view can trigger must not be something the caller chooses.
+  it('caps the ledger fan-out and looks at the primary wallet first', async () => {
+    purchaseFindFirst.mockResolvedValue(null)
+    nftFindUnique.mockResolvedValue({ nftokenId: NFTOKEN_ID } as never)
+    walletFindMany.mockResolvedValue([{ address: 'rPrimary' }] as never)
+    ownsNft.mockResolvedValue(false)
+
+    await resolveEntitlement('user-1', paidListing)
+
+    expect(walletFindMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      select: { address: true },
+      orderBy: { isPrimary: 'desc' },
+      take: 3,
+    })
+  })
+
   it('returns null when no wallet holds the NFToken', async () => {
     purchaseFindFirst.mockResolvedValue(null)
     nftFindUnique.mockResolvedValue({ nftokenId: NFTOKEN_ID } as never)
