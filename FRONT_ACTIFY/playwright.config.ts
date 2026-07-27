@@ -11,7 +11,10 @@ const API_BASE = `http://localhost:${API_PORT}/api/v1`
  * True end-to-end: the real Nuxt front talks to the real Node API, which runs
  * against an in-memory pglite Postgres. The only substituted boundary is the
  * wallet browser-extension, replaced by an in-page signer that produces real
- * XRPL signatures the backend cryptographically verifies. See tests/e2e/README.md.
+ * XRPL signatures the backend cryptographically verifies. See ../README.md.
+ *
+ * Every e2e spec of the project lives here; the API side only ships the harness
+ * that boots it (API_ACTIFY_NODE/tests/e2e-harness).
  */
 export default defineConfig({
   testDir: './tests/e2e/',

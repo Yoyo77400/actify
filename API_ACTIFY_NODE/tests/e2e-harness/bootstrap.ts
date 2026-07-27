@@ -1,5 +1,9 @@
 /**
- * E2E backend bootstrap.
+ * E2E backend harness — infrastructure, NOT a test suite.
+ *
+ * There are no e2e specs in this repo's backend: they all live in
+ * FRONT_ACTIFY/tests/e2e, since driving them needs a browser. This file only
+ * provides the API those specs run against; Playwright starts it as a webServer.
  *
  * Boots the REAL Actify API (createApp + real services/prisma) against an
  * in-memory PostgreSQL provided by pglite (Postgres compiled to WASM). No
