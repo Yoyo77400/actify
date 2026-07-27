@@ -26,7 +26,11 @@
             <span class="pill-badge">{{ user.followingCount }} following</span>
           </div>
         </div>
-        <button class="secondary-btn flex items-center gap-2 shrink-0 text-sm font-medium" type="button">
+        <button
+          class="secondary-btn flex items-center gap-2 shrink-0 text-sm font-medium"
+          type="button"
+          @click="emit('edit')"
+        >
           <Icon name="ph:pencil-simple" class="text-base" />
           Edit profile
         </button>
@@ -43,4 +47,6 @@
 import type { UserProfile } from '~/types/profile'
 
 defineProps<{ user: UserProfile }>()
+
+const emit = defineEmits<{ edit: [] }>()
 </script>

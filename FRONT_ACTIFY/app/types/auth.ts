@@ -30,6 +30,7 @@ export interface MeProfile {
   email: string | null
   bio: string | null
   avatarCid: string | null
+  bannerCid: string | null
   wallets: WalletInfo[]
   role: string
   isVerified: boolean

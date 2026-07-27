@@ -22,3 +22,15 @@ export async function setAssetThumbnail(userId: string, listingId: string, key: 
   await prisma.listing.update({ where: { id: listingId }, data: { thumbnailCid: key } })
   return { thumbnailCid: key }
 }
+
+/** Records the uploaded avatar's storage key on the caller's own profile. */
+export async function setUserAvatar(userId: string, key: string) {
+  await prisma.user.update({ where: { id: userId }, data: { avatarCid: key } })
+  return { avatarCid: key }
+}
+
+/** Records the uploaded banner's storage key on the caller's own profile. */
+export async function setUserBanner(userId: string, key: string) {
+  await prisma.user.update({ where: { id: userId }, data: { bannerCid: key } })
+  return { bannerCid: key }
+}

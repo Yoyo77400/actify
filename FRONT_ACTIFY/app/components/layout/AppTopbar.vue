@@ -2,6 +2,17 @@
 const { user, isLoggedIn, logout } = useAuth()
 
 const displayName = computed(() => user.value?.displayName || user.value?.username || 'Mon compte')
+
+// Global search: assets, collections and creators by name. /search owns the
+// querying and the URL sync; this box only hands the term over, so there is no
+// second, divergent implementation.
+const term = ref('')
+
+function submitSearch() {
+  const q = term.value.trim()
+  if (!q) return
+  navigateTo({ path: '/search', query: { q } })
+}
 </script>
 
 <template>
@@ -9,9 +20,12 @@ const displayName = computed(() => user.value?.displayName || user.value?.userna
     <div class="surface--soft min-w-[280px] w-[min(100%,360px)] h-11 px-3 flex items-center gap-2.5 max-md:w-full">
       <span class="text-muted">⌕</span>
       <input
+        v-model="term"
         class="flex-1 bg-transparent border-0 outline-none text-foreground placeholder:text-muted"
-        type="text"
+        type="search"
         placeholder="Search Actify"
+        aria-label="Rechercher sur Actify"
+        @keyup.enter="submitSearch"
       >
       <span class="text-muted">/</span>
     </div>

@@ -31,3 +31,30 @@ function placeholderImage(seed: string): string {
 export function assetImage(thumbnailCid: string | null | undefined, seed: string): string {
   return fileUrl(thumbnailCid) ?? placeholderImage(seed)
 }
+
+// Plain hue-varied gradient — no glyph, since this is rendered as a small
+// circle where the asset placeholder's picture icon reads as noise.
+function avatarPlaceholder(seed: string): string {
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+  const hue = hash % 360
+  const svg
+    = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">`
+    + `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">`
+    + `<stop offset="0" stop-color="hsl(${hue} 38% 30%)"/>`
+    + `<stop offset="1" stop-color="hsl(${(hue + 45) % 360} 34% 16%)"/>`
+    + `</linearGradient></defs>`
+    + `<rect width="200" height="200" fill="url(#g)"/>`
+    + `</svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
+/** Profile avatar, falling back to a deterministic local tile. */
+export function avatarImage(avatarCid: string | null | undefined, seed: string): string {
+  return fileUrl(avatarCid) ?? avatarPlaceholder(seed)
+}
+
+/** Profile banner, falling back to the same tile family as asset covers. */
+export function bannerImage(bannerCid: string | null | undefined, seed: string): string {
+  return fileUrl(bannerCid) ?? placeholderImage(seed)
+}
