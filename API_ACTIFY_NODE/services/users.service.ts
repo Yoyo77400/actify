@@ -10,6 +10,7 @@ export interface UpdateMeInput {
   displayName?: string | null
   bio?: string | null
   avatarCid?: string | null
+  bannerCid?: string | null
 }
 
 interface WalletSummary {
@@ -28,6 +29,7 @@ function serializeMe(user: {
   email: string | null
   bio: string | null
   avatarCid: string | null
+  bannerCid: string | null
   isVerified: boolean
   twoFactorEnabled: boolean
   createdAt: Date
@@ -41,6 +43,7 @@ function serializeMe(user: {
     email: user.email,
     bio: user.bio,
     avatarCid: user.avatarCid,
+    bannerCid: user.bannerCid,
     wallets: user.wallets,
     role: user.role.name,
     isVerified: user.isVerified,
@@ -55,6 +58,7 @@ function serializePublic(user: {
   displayName: string | null
   bio: string | null
   avatarCid: string | null
+  bannerCid: string | null
   isVerified: boolean
   createdAt: Date
   role: { name: string }
@@ -65,6 +69,7 @@ function serializePublic(user: {
     displayName: user.displayName,
     bio: user.bio,
     avatarCid: user.avatarCid,
+    bannerCid: user.bannerCid,
     role: user.role.name,
     isVerified: user.isVerified,
     createdAt: user.createdAt,
@@ -140,6 +145,10 @@ export async function updateMe(userId: string, input: UpdateMeInput) {
     data.avatarCid = input.avatarCid
   }
 
+  if (input.bannerCid !== undefined) {
+    data.bannerCid = input.bannerCid
+  }
+
   const user = await prisma.user.update({
     where: { id: userId },
     data,
@@ -163,6 +172,7 @@ export async function softDeleteMe(userId: string) {
         email: null,
         bio: null,
         avatarCid: null,
+        bannerCid: null,
       },
     }),
   ])

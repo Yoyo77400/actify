@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { test as base_test, expect, type Page } from '@playwright/test'
 import { WALLET_POOLS, type E2eAccount } from './accounts'
 
 /**
@@ -10,7 +10,7 @@ import { WALLET_POOLS, type E2eAccount } from './accounts'
  * file with `test.use({ walletPool: WALLET_POOLS.signup })`, or force a raw seed
  * with `test.use({ walletSeed: '' })` to simulate having no wallet at all.
  */
-export const test = base.extend<{
+export const test = base_test.extend<{
   // The pool is named, not passed by value: Playwright reads an array given to
   // test.use() as a [value, options] tuple and would silently hand the fixture
   // just its first element.
@@ -80,6 +80,24 @@ export async function gotoSecuritySettings(page: Page) {
   await hydrated
 }
 
+/**
+ * Types a term in the topbar box and submits it, retrying until the router has
+ * actually moved.
+ *
+ * The topbar ships server-rendered, so an Enter pressed before hydration is
+ * swallowed. Retrying is safe here where a single click would not be: this
+ * submit is idempotent — it always routes to the same /search?q= URL — whereas
+ * a double-fired 2FA enrollment would regenerate the secret mid-test.
+ */
+export async function searchFromTopbar(page: Page, term: string) {
+  const box = page.getByLabel('Rechercher sur Actify')
+  await expect(async () => {
+    await box.fill(term)
+    await box.press('Enter')
+    await expect(page).toHaveURL(/\/search\?q=/, { timeout: 1000 })
+  }).toPass({ timeout: 15_000 })
+}
+
 export { expect }
 
 type WalletLabel = 'GemWallet' | 'Crossmark'
@@ -96,14 +114,30 @@ export async function walletLogin(page: Page, wallet: WalletLabel = 'GemWallet')
 }
 
 /**
+ * Username scoped to the current attempt.
+ *
+ * Wallets rotate per retry (see the `wallet` fixture) but usernames are unique
+ * database-wide, so a retry reusing the base name hits USERNAME_TAKEN and fails
+ * for a reason unrelated to the original failure — the exact misleading retry
+ * the wallet pools exist to prevent.
+ */
+export function attemptUsername(base: string): string {
+  const { retry } = base_test.info()
+  return retry === 0 ? base : `${base}_r${retry}`
+}
+
+/**
  * Full signup for the spec's wallet: sign in, then complete the profile form
  * the backend routes new accounts to. Leaves the browser on /profile with a
- * usable session, which is the starting state most scenarios need.
+ * usable session, which is the starting state most scenarios need. Returns the
+ * username actually used, which differs from `username` on a retry.
  */
 export async function registerNewAccount(page: Page, username: string) {
+  const name = attemptUsername(username)
   await walletLogin(page)
   await expect(page).toHaveURL(/\/auth\/register/)
-  await page.getByLabel('Username').fill(username)
+  await page.getByLabel('Username').fill(name)
   await page.getByRole('button', { name: /Créer mon compte/i }).click()
   await expect(page).toHaveURL(/\/profile/)
+  return name
 }

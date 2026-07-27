@@ -8,7 +8,7 @@ test.use({ walletPool: 'export' })
 // already — a legal obligation silently failing for most users.
 test.describe('gdprDataExport', () => {
   test('exportsAccountDataWithout2faEnrolled', async ({ page, wallet }) => {
-    await registerNewAccount(page, 'e2e_export')
+    const username = await registerNewAccount(page, 'e2e_export')
 
     await gotoPrivacySettings(page)
 
@@ -25,7 +25,7 @@ test.describe('gdprDataExport', () => {
     // The file must actually carry this user's data, not an empty envelope.
     const path = await download.path()
     const payload = JSON.parse(await readFile(path, 'utf8'))
-    expect(JSON.stringify(payload)).toContain('e2e_export')
+    expect(JSON.stringify(payload)).toContain(username)
     expect(JSON.stringify(payload)).toContain(wallet.address)
   })
 })

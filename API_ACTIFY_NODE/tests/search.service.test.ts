@@ -5,6 +5,7 @@ vi.mock('../services/prisma', () => ({
     listing: { findMany: vi.fn(), count: vi.fn() },
     user: { findMany: vi.fn(), count: vi.fn() },
     tag: { findMany: vi.fn() },
+    collection: { findMany: vi.fn(), count: vi.fn() },
   },
 }))
 
@@ -16,6 +17,16 @@ const listingCount = vi.mocked(prisma.listing.count)
 const userFindMany = vi.mocked(prisma.user.findMany)
 const userCount = vi.mocked(prisma.user.count)
 const tagFindMany = vi.mocked(prisma.tag.findMany)
+const collectionFindMany = vi.mocked(prisma.collection.findMany)
+const collectionCount = vi.mocked(prisma.collection.count)
+
+const collectionRow = {
+  id: 1,
+  name: 'Neon Collection',
+  slug: 'neon-collection',
+  img: null,
+  _count: { listings: 3 },
+}
 
 const pagination = { page: 1, limit: 20, skip: 0 }
 
@@ -139,17 +150,35 @@ describe('search', () => {
     )
   })
 
-  it('type=all (default) returns both lists without meta', async () => {
+  it('type=all (default) returns the three lists without meta', async () => {
     listingFindMany.mockResolvedValue([listingRow] as never)
     listingCount.mockResolvedValue(1)
     userFindMany.mockResolvedValue([creatorRow] as never)
     userCount.mockResolvedValue(1)
+    collectionFindMany.mockResolvedValue([collectionRow] as never)
+    collectionCount.mockResolvedValue(1)
 
     const { results, meta } = await search({ q: 'a' }, pagination)
 
     expect(results.assets).toHaveLength(1)
     expect(results.creators).toHaveLength(1)
+    expect(results.collections).toHaveLength(1)
     expect(meta).toBeUndefined()
+  })
+
+  it('type=collections searches collections by name and carries their meta', async () => {
+    collectionFindMany.mockResolvedValue([collectionRow] as never)
+    collectionCount.mockResolvedValue(1)
+
+    const { results, meta } = await search({ q: 'neon', type: 'collections' }, pagination)
+
+    expect(results.collections).toEqual([
+      { id: 1, name: 'Neon Collection', slug: 'neon-collection', img: null, listingCount: 3 },
+    ])
+    // The other two lists are not even queried for a single-type search.
+    expect(listingFindMany).not.toHaveBeenCalled()
+    expect(results.assets).toEqual([])
+    expect(meta).toMatchObject({ total: 1 })
   })
 })
 
@@ -159,10 +188,11 @@ describe('getSuggestions', () => {
     await expect(getSuggestions('  ')).rejects.toMatchObject({ status: 400, code: 'VALIDATION_ERROR' })
   })
 
-  it('returns top titles, tag names and usernames', async () => {
+  it('returns top titles, tag names, usernames and collection names', async () => {
     listingFindMany.mockResolvedValue([{ title: 'Neon Pack' }, { title: 'Neon City' }] as never)
     tagFindMany.mockResolvedValue([{ name: 'neon' }] as never)
     userFindMany.mockResolvedValue([{ username: 'neo' }, { username: null }] as never)
+    collectionFindMany.mockResolvedValue([{ name: 'Neon Collection' }] as never)
 
     const result = await getSuggestions('neo')
 
@@ -170,6 +200,7 @@ describe('getSuggestions', () => {
       titles: ['Neon Pack', 'Neon City'],
       tags: ['neon'],
       usernames: ['neo'],
+      collections: ['Neon Collection'],
     })
     expect(listingFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }))
     expect(tagFindMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }))
