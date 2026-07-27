@@ -33,6 +33,11 @@ export interface XrplTx {
   }
 }
 
+/** Endpoint every XRPL read goes through (tx lookups, account_nfts). */
+export function xrplRpcUrl(): string {
+  return process.env.XRPL_RPC_URL ?? DEFAULT_XRPL_RPC_URL
+}
+
 function positiveEnvInt(name: string, fallback: number): number {
   const parsed = Number.parseInt(process.env[name] ?? '', 10)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
@@ -64,7 +69,7 @@ async function requestTx(rpcUrl: string, txHash: string): Promise<XrplTx | undef
  * the final state (TX_NOT_FOUND / TX_NOT_VALIDATED / TX_LOOKUP_FAILED).
  */
 export async function fetchValidatedTx(txHash: string): Promise<XrplTx> {
-  const rpcUrl = process.env.XRPL_RPC_URL ?? DEFAULT_XRPL_RPC_URL
+  const rpcUrl = xrplRpcUrl()
   const attempts = positiveEnvInt('XRPL_TX_POLL_ATTEMPTS', DEFAULT_POLL_ATTEMPTS)
   const intervalMs = positiveEnvInt('XRPL_TX_POLL_INTERVAL_MS', DEFAULT_POLL_INTERVAL_MS)
 

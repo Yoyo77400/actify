@@ -44,9 +44,23 @@ export interface AssetCard {
   tags: string[]
 }
 
+/** Why the current viewer may download this asset — null when they may not. */
+export type EntitlementReason = 'free' | 'purchase' | 'nft_owner'
+
+export interface ViewerEntitlement {
+  canDownload: boolean
+  reason: EntitlementReason | null
+}
+
 export interface AssetDetail extends AssetCard {
   averageRating: number | null
   reviewsCount: number
+  viewerEntitlement: ViewerEntitlement
+}
+
+export interface DownloadTicket {
+  downloadToken: string
+  expiresAt: string
 }
 
 export interface CategoryWithCount {

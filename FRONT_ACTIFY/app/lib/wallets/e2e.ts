@@ -1,6 +1,13 @@
 import { deriveKeypair, deriveAddress, sign } from 'ripple-keypairs'
 import { walletDescriptors } from './index'
-import { utf8ToHex, WalletRejectedError, type MintNftParams, type WalletAdapter, type WalletId } from './types'
+import {
+  utf8ToHex,
+  WalletRejectedError,
+  type MintNftParams,
+  type SendPaymentParams,
+  type WalletAdapter,
+  type WalletId,
+} from './types'
 
 /**
  * In-page test wallet used by the Playwright e2e suite in place of the browser
@@ -72,6 +79,12 @@ export function makeE2eAdapter(id: WalletId): WalletAdapter {
     // real testnet submission. Kept explicit so no test silently relies on it.
     async mintNft(_params: MintNftParams): Promise<{ txHash: string }> {
       throw new Error('e2e wallet: mintNft is not supported (needs a real XRPL testnet submission)')
+    },
+
+    // Same reason: order confirmation verifies a validated Payment on the
+    // ledger, which no in-page signer can produce without submitting for real.
+    async sendPayment(_params: SendPaymentParams): Promise<{ txHash: string }> {
+      throw new Error('e2e wallet: sendPayment is not supported (needs a real XRPL testnet submission)')
     },
   }
 }

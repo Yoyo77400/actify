@@ -7,6 +7,8 @@ vi.mock('../services/prisma', () => ({
     listing: { findFirst: vi.fn() },
     purchase: { findFirst: vi.fn() },
     download: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), count: vi.fn() },
+    nft: { findUnique: vi.fn() },
+    wallet: { findMany: vi.fn() },
   },
 }))
 
@@ -20,6 +22,7 @@ const downloadFindFirst = vi.mocked(prisma.download.findFirst)
 const downloadFindMany = vi.mocked(prisma.download.findMany)
 const downloadCreate = vi.mocked(prisma.download.create)
 const downloadCount = vi.mocked(prisma.download.count)
+const nftFindUnique = vi.mocked(prisma.nft.findUnique)
 
 const JWT_SECRET = process.env.JWT_SECRET!
 const ONE_HOUR_MS = 60 * 60 * 1000
@@ -30,6 +33,10 @@ const freeListing = { id: 'listing-1', isFree: true, maxDownloads: null, fileIpf
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Default: nothing tokenized, so the entitlement resolves from the database
+  // alone and no test reaches the XRPL. The on-chain path is covered in
+  // entitlements.service.test.ts.
+  nftFindUnique.mockResolvedValue(null as never)
 })
 
 describe('requestDownload', () => {
