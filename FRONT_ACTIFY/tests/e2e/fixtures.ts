@@ -80,24 +80,6 @@ export async function gotoSecuritySettings(page: Page) {
   await hydrated
 }
 
-/**
- * Types a term in the topbar box and submits it, retrying until the router has
- * actually moved.
- *
- * The topbar ships server-rendered, so an Enter pressed before hydration is
- * swallowed. Retrying is safe here where a single click would not be: this
- * submit is idempotent — it always routes to the same /search?q= URL — whereas
- * a double-fired 2FA enrollment would regenerate the secret mid-test.
- */
-export async function searchFromTopbar(page: Page, term: string) {
-  const box = page.getByLabel('Rechercher sur Actify')
-  await expect(async () => {
-    await box.fill(term)
-    await box.press('Enter')
-    await expect(page).toHaveURL(/\/search\?q=/, { timeout: 1000 })
-  }).toPass({ timeout: 15_000 })
-}
-
 export { expect }
 
 type WalletLabel = 'GemWallet' | 'Crossmark'

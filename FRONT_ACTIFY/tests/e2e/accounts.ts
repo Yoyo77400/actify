@@ -55,16 +55,6 @@ export const WALLET_POOLS = {
     { seed: 'sEdVGAYccmqXAHFqRXLqZqAp4BRrECW', address: 'rn2nnqRzUfwx4VYhZhXPqrvQ2sLGm12Xq6' },
     { seed: 'sEdTU2HXyEiwHe6xA8BVBH9ZbuJ9sNs', address: 'rhoEmGj7xmornJfeUXwmsnqZLkY8rwJhCf' },
   ],
-  collections: [
-    { seed: 'sEdVKX4BobXkbrcjb9fca3gqkbqwNpt', address: 'rL6WvL6GwfPgt1kidQyoF9Uair2RSFFpbY' },
-    { seed: 'sEdVrZ22VdfCgcNV73BYfQttrZ58Y39', address: 'rHBX9N65YqMswE4vWAAbZfQqoKps9XctLF' },
-    { seed: 'sEdT2zz58ULTNGgppdEeKPW4kGSub4u', address: 'rQr3gBLzLh1YLPrFGfLcCoW3MdLVgZoN58' },
-  ],
-  profile: [
-    { seed: 'sEd71i5JMXYEDfov36dkNkzejQddewL', address: 'rfSJVMYWT8fo7PvkTvL3Rt7V27MJiA8pne' },
-    { seed: 'sEdVKFuK6CQkrdapv6dgw18yNkgb21Q', address: 'rsrFqobET25GTNYHW67TCZJhFSwGgPodjp' },
-    { seed: 'sEdTfmcVmw6rYL7yTcbGYXi6gmS91QH', address: 'rJyNPNTTMvm1dbAZ5HJJ6p2K6WVFMpjmtn' },
-  ],
   delete: [
     { seed: 'sEdSgQUWadrW7tW1Crxvzc9mbU9FQam', address: 'rhXhyk2aDKPSPYaHwUijcFuJPsMStWr7sH' },
     { seed: 'sEdVGKUxd8Z6APeuezWeSozTct86Zpj', address: 'rwMwU9bkFUGUedau6yJrZ3i8Sev5RCWpxm' },
