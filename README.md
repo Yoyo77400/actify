@@ -213,6 +213,44 @@ Ne lancer qu'**un seul test**
 npm run test:e2e -- -g "newWalletCreatesAccountAndOpensSession"
 ```
 
+Vrai front Nuxt → vraie API Node → Postgres en mémoire (pglite). Seule l'extension wallet est
+remplacée, par un signeur in-page qui produit de vraies signatures XRPL.
+
+Ces tests tournent aussi en CI à chaque PR (job `e2e`). En cas d'échec, le rapport HTML est
+archivé en artefact du run — traces et captures incluses.
+
+#### Ce qui est couvert
+
+| Fichier | Scénario | Pourquoi c'est prioritaire |
+|---|---|---|
+| `auth.spec.ts` | Login wallet, bouton désactivé sans wallet | |
+| `totp-bruteforce.spec.ts` | Enrôlement 2FA, gate au login, throttle des codes | Prise de contrôle de compte : 6 chiffres, aucun lockout |
+| `signup.spec.ts` | Inscription complète → profil persisté | Casse ici = plus aucun nouvel utilisateur |
+| `data-export.spec.ts` | Export RGPD sans 2FA activée | Obligation légale, avait déjà régressé en 403 |
+| `account-deletion.spec.ts` | Confirmation "SUPPRIMER" puis accès révoqué | Irréversible : le wallet est l'unique accès |
+
+#### Où vivent les tests
+
+| | Emplacement | Outil |
+|---|---|---|
+| Tests unitaires API | `API_ACTIFY_NODE/tests/*.test.ts` | vitest |
+| Tests e2e | `FRONT_ACTIFY/tests/e2e/*.spec.ts` | Playwright |
+| Harness API pour l'e2e | `API_ACTIFY_NODE/tests/e2e-harness/` | *(pas des tests)* |
+
+**Tous les specs e2e sont côté front** : les piloter demande un navigateur. Le back n'héberge que
+l'infra qui démarre l'API pour ces tests — d'où `e2e-harness`, renommé depuis `tests/e2e` qui
+laissait croire à une seconde suite.
+
+#### Pièges connus
+
+* Un wallet par scénario (`accounts.ts`) : la base pglite est partagée sur toute la session, des
+  comptes communs créeraient des dépendances d'ordre entre fichiers.
+* `totp.ts` génère les codes TOTP côté test — le test joue l'app d'authentification de l'utilisateur.
+* Les pages sont en SSR : un clic envoyé avant l'hydratation est perdu silencieusement. D'où
+  `gotoPrivacySettings()`, qui attend un signal côté client avant d'agir.
+* Le bandeau cookies est fixé en bas de page et intercepte les clics : les fixtures tranchent le
+  consentement d'avance.
+
 ---
 
 ## Licence
