@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=ACTIFY Populater
+Comment=Ferme/relance Brave en mode debug puis importe les produits de list.csv
+Exec=gnome-terminal -- bash -c "'/home/ethan/actify/populater/run.sh'; echo; read -r -p 'Appuie sur Entree pour fermer cette fenetre... '"
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;
