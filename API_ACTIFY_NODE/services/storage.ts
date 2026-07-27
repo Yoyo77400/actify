@@ -1,13 +1,30 @@
 import { closeSync, createReadStream, existsSync, mkdirSync, openSync, readSync } from 'node:fs'
+import { writeFile } from 'node:fs/promises'
 import { extname, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import multer from 'multer'
+import sharp from 'sharp'
 
 // Local file storage: uploaded asset files live on disk (a Docker volume in
 // prod). Dev runs the API on the host, so this defaults to ./uploads.
 const UPLOADS_DIR = resolve(process.env.UPLOADS_DIR ?? join(process.cwd(), 'uploads'))
 const MAX_FILE_BYTES = 50 * 1024 * 1024 // 50 MB
 const IMAGE_MIME = /^image\/(png|jpe?g|webp|gif|avif)$/
+
+// Thumbnails are previews, not deliverables: a buyer never needs the full
+// 50MB original just to see a card on the marketplace. Capped independently
+// of MAX_FILE_BYTES so the limit can move without touching this.
+const THUMBNAIL_MAX_DIMENSION = 800
+const THUMBNAIL_QUALITY = 75
+const THUMBNAIL_MAX_BYTES = 1024 * 1024 // hard cap: a stored thumbnail is never over 1MB
+// If the first pass is still over the cap (rare - dense/detailed source
+// images), retry smaller/lower-quality until it fits.
+const THUMBNAIL_FALLBACK_STEPS = [
+  { dimension: 800, quality: 50 },
+  { dimension: 600, quality: 45 },
+  { dimension: 450, quality: 35 },
+  { dimension: 300, quality: 30 },
+] as const
 
 if (!existsSync(UPLOADS_DIR)) {
   mkdirSync(UPLOADS_DIR, { recursive: true })
@@ -47,6 +64,53 @@ export function resolveStoredPath(key: string): string | null {
 export function streamStored(key: string) {
   const path = resolveStoredPath(key)
   return path ? createReadStream(path) : null
+}
+
+// sharp reports avif input as 'heif' (avif is a compression profile of the
+// HEIF container) - falls through to the jpeg default below, which is fine
+// for a lightweight preview.
+type ThumbnailFormat = 'png' | 'webp' | 'gif' | string | undefined
+
+async function encodeThumbnail(path: string, format: ThumbnailFormat, dimension: number, quality: number): Promise<Buffer> {
+  const pipeline = sharp(path)
+    .rotate() // bake in EXIF orientation before it's stripped
+    .resize({ width: dimension, height: dimension, fit: 'inside', withoutEnlargement: true })
+
+  switch (format) {
+    case 'png':
+      pipeline.png({ quality, palette: true })
+      break
+    case 'webp':
+      pipeline.webp({ quality })
+      break
+    case 'gif':
+      pipeline.gif() // lossless-only in sharp; the dimension cap still shrinks it
+      break
+    default:
+      pipeline.jpeg({ quality, mozjpeg: true })
+  }
+
+  return pipeline.toBuffer()
+}
+
+/**
+ * Resizes and recompresses an uploaded thumbnail in place: starts at
+ * THUMBNAIL_MAX_DIMENSION/THUMBNAIL_QUALITY, keeping the original format, and
+ * if that's still over THUMBNAIL_MAX_BYTES (dense/detailed source images)
+ * retries smaller and lower-quality until it fits. Throws if `path` isn't a
+ * real, decodable image - callers should treat that as a validation failure,
+ * not a server error.
+ */
+export async function compressThumbnail(path: string): Promise<void> {
+  const { format } = await sharp(path).metadata()
+
+  let buffer = await encodeThumbnail(path, format, THUMBNAIL_MAX_DIMENSION, THUMBNAIL_QUALITY)
+  for (const step of THUMBNAIL_FALLBACK_STEPS) {
+    if (buffer.byteLength <= THUMBNAIL_MAX_BYTES) break
+    buffer = await encodeThumbnail(path, format, step.dimension, step.quality)
+  }
+
+  await writeFile(path, buffer)
 }
 
 const SNIFF_BYTES = 16

@@ -27,7 +27,8 @@
     "multer": "^2.2.0",
     "pg": "^8.18.0",
     "qrcode": "^1.5.4",
-    "ripple-keypairs": "^3.0.0"
+    "ripple-keypairs": "^3.0.0",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
