@@ -15,6 +15,14 @@ node_modules/
 API_ACTIFY_NODE/node_modules/
 FRONT_ACTIFY/node_modules/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
 
 # Logslogs
 *.log
