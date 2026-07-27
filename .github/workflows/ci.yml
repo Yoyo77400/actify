@@ -82,6 +82,56 @@ jobs:
       - name: Linter
         run: npx eslint .
 
+  # ── E2E (Playwright : front réel → API réelle → Postgres pglite) ───────────
+  # Le job installe LES DEUX packages : Playwright démarre lui-même l'API
+  # (webServer, cwd ../API_ACTIFY_NODE) puis le front, et les pilote dans
+  # Chromium. Aucun service externe — la base est un pglite en mémoire, et les
+  # signatures XRPL sont produites en page (cf. section Tests du README).
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Aucune étape n'utilise git après le checkout : pas de token persisté.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            API_ACTIFY_NODE/package-lock.json
+            FRONT_ACTIFY/package-lock.json
+
+      - name: Installer les dépendances de l'API
+        working-directory: API_ACTIFY_NODE
+        run: npm ci
+
+      - name: Installer les dépendances du front
+        working-directory: FRONT_ACTIFY
+        run: npm ci
+
+      # Chromium seul : c'est le seul projet déclaré dans playwright.config.ts.
+      - name: Installer Chromium
+        working-directory: FRONT_ACTIFY
+        run: npx playwright install --with-deps chromium
+
+      # CI=true bascule la config en mode strict : pas de réutilisation d'un
+      # serveur déjà lancé, 2 retries, et `test.only` fait échouer le run.
+      - name: Lancer les tests e2e
+        working-directory: FRONT_ACTIFY
+        run: npm run test:e2e
+
+      # Le rapport HTML porte traces, captures et vidéos des retries : c'est ce
+      # qui rend un échec diagnosticable sans rejouer le run en local.
+      - name: Archiver le rapport en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: FRONT_ACTIFY/playwright-report/
+          retention-days: 7
+
   # ── Images Docker ──────────────────────────────────────────────────────────
   # Reproduit les builds `target: production` de docker-compose.prod.yml (sans
   # push) : un Dockerfile cassé fait échouer la CI, donc bloque le déploiement
