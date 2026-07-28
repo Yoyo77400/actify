@@ -79,6 +79,8 @@ function fullListing(overrides: Record<string, unknown> = {}) {
     seller: { id: SELLER, username: 'alice', displayName: 'Alice' },
     listingCategories: [],
     listingTags: [],
+    // Ventes confirmées, comme le renvoie FULL_INCLUDE (pilote `soldOut`).
+    _count: { purchases: 0 },
     ...overrides,
   }
 }

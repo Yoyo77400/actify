@@ -10,6 +10,7 @@ const ORDER_CONFIRMED = 'Confirmed'
 const ORDER_CANCELLED = 'Cancelled'
 const LISTING_PUBLISHED = 'Published'
 const LIMITED_DISTRIBUTION = 'limited'
+const UNIQUE_DISTRIBUTION = 'unique'
 // Only native XRP payments are verifiable on-chain today; a listing priced in
 // any other currency can't be confirmed until multi-currency support lands.
 const SUPPORTED_CURRENCY = 'XRP'
@@ -95,15 +96,37 @@ async function getSellerPrimaryWalletOrThrow(sellerId: string) {
   return wallet
 }
 
-async function assertLimitedStockAvailable(listing: { id: string; distributionMode: string; maxDownloads: number | null }) {
-  if (listing.distributionMode !== LIMITED_DISTRIBUTION || listing.maxDownloads == null) {
+/**
+ * How many confirmed sales an asset accepts, or null when uncapped.
+ * A `unique` listing is a one-of-a-kind piece: capacity 1, regardless of
+ * maxDownloads (the creation form only fills that field for `limited`).
+ */
+function saleCapacity(listing: { distributionMode: string; maxDownloads: number | null }): number | null {
+  if (listing.distributionMode === UNIQUE_DISTRIBUTION) return 1
+  if (listing.distributionMode === LIMITED_DISTRIBUTION) return listing.maxDownloads
+  return null
+}
+
+/**
+ * Refuses a sale once the asset is exhausted.
+ *
+ * Ran on order creation AND again at confirm: buyers can hold Pending orders
+ * concurrently, so the capacity has to be re-checked against the money actually
+ * arriving. `unique` was skipped here entirely, which let a second buyer pay for
+ * a piece already sold — they lost real XRP for an NFT that could never transfer.
+ */
+async function assertStockAvailable(listing: { id: string; distributionMode: string; maxDownloads: number | null }) {
+  const capacity = saleCapacity(listing)
+  if (capacity == null) {
     return
   }
   const confirmedCount = await prisma.purchase.count({
     where: { listingId: listing.id, status: ORDER_CONFIRMED },
   })
-  if (confirmedCount >= listing.maxDownloads) {
-    throw new AppError(410, 'MAX_DOWNLOADS_REACHED', 'Limite de téléchargements atteinte pour cet asset')
+  if (confirmedCount >= capacity) {
+    throw listing.distributionMode === UNIQUE_DISTRIBUTION
+      ? new AppError(410, 'SOLD_OUT', 'Cette pièce unique a déjà été vendue')
+      : new AppError(410, 'MAX_DOWNLOADS_REACHED', 'Limite de téléchargements atteinte pour cet asset')
   }
 }
 
@@ -129,7 +152,7 @@ export async function createOrder(userId: string, input: CreateOrderInput) {
     throw new AppError(400, 'VALIDATION_ERROR', `Seuls les paiements en ${SUPPORTED_CURRENCY} sont supportés`)
   }
 
-  await assertLimitedStockAvailable(listing)
+  await assertStockAvailable(listing)
 
   const sellerWallet = await getSellerPrimaryWalletOrThrow(listing.sellerId)
   const paymentTag = randomInt(0, MAX_DESTINATION_TAG)
@@ -216,7 +239,7 @@ export async function confirmOrder(userId: string, orderId: string, txHash: unkn
 
   // Re-check stock at confirm: many buyers can hold Pending orders for a
   // 1-copy asset; without this they could all confirm and oversell it.
-  await assertLimitedStockAvailable({
+  await assertStockAvailable({
     id: purchase.listing.id,
     distributionMode: purchase.listing.distributionMode,
     maxDownloads: purchase.listing.maxDownloads,
@@ -250,6 +273,16 @@ export async function confirmOrder(userId: string, orderId: string, txHash: unkn
   if (affected.count === 0) {
     throw new AppError(409, 'ORDER_NOT_PENDING', 'La commande a déjà été traitée')
   }
+
+  // Denormalised counter, kept solely so the catalogue can sort by sales (an
+  // index can't serve a relation count). The guarded transition above ran
+  // exactly once, so this cannot double-count. Reads never depend on it:
+  // serializeListing derives its figures from the purchases themselves, so a
+  // crash between the two writes only costs a slightly stale sort order.
+  await prisma.listing.update({
+    where: { id: purchase.listing.id },
+    data: { salesCount: { increment: 1 } },
+  })
 
   await notifyUser(
     purchase.listing.sellerId,
