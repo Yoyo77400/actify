@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // logique métier seule (test unitaire = on isole l'unité sous test).
 vi.mock('../services/prisma', () => ({
   prisma: {
+    session: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
     walletChallenge: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     wallet: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
     user: { create: vi.fn(), update: vi.fn() },
@@ -61,6 +62,7 @@ function validInput(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+    vi.mocked(prisma.session.create).mockResolvedValue({ id: 'session-1' } as never)
   vi.clearAllMocks()
   verifySignature = vi.fn().mockReturnValue(true)
   chainVerifier.mockReturnValue({ verify: verifySignature } as never)

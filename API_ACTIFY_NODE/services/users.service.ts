@@ -1,4 +1,5 @@
 import { prisma } from './prisma'
+import { revokeAllUserSessions } from './sessions.service'
 import { AppError, buildMeta } from '../utils/http'
 import type { Pagination } from '../utils/pagination'
 
@@ -177,6 +178,9 @@ export async function adminUpdateUser(userId: string, input: Pick<UpdateMeInput,
 export async function softDeleteMe(userId: string) {
   // Wallets are the account's only credential — wipe them so the erased
   // account has no dangling login method, then scrub the remaining PII.
+  // Sessions go too: an access token issued minutes earlier would otherwise
+  // keep working against the erased account until it expired.
+  await revokeAllUserSessions(userId)
   const [, user] = await prisma.$transaction([
     prisma.wallet.deleteMany({ where: { userId } }),
     prisma.user.update({

@@ -69,7 +69,11 @@ export default defineConfig({
       reuseExistingServer: false,
       env: {
         PORT: String(FRONT_PORT),
-        NUXT_PUBLIC_API_BASE: API_BASE,
+        // Pas de NUXT_PUBLIC_API_BASE : le navigateur appelle /api/v1 sur sa
+        // propre origine, comme en dev et en prod, et Nitro relaie vers l'API.
+        // Un appel cross-origin direct casserait les cookies de session, que le
+        // navigateur refuse d'envoyer/stocker sans CORS credentials.
+        NUXT_DEV_API_ORIGIN: `http://127.0.0.1:${API_PORT}`,
       },
     },
   ],

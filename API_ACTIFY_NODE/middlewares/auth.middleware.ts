@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from 'express'
-import { prisma } from '../services/prisma'
 import { AppError } from '../utils/http'
-import { extractBearerToken, verifyToken } from '../utils/jwt'
+import { verifyToken } from '../utils/jwt'
+import { readAccessToken } from '../utils/auth-cookies'
+import { findUsableSession } from '../services/sessions.service'
 
 // Decoupled from however the token was issued (wallet-connect today, maybe
 // more chains or Auth2 later) — anything that signs a JWT with { sub: userId }
@@ -15,14 +16,23 @@ async function resolveUser(token: string) {
   const userId = payload.sub
   if (!userId || typeof userId !== 'string') return null
 
-  const user = await prisma.user.findUnique({ where: { id: userId } })
-  if (!user || user.deletedAt) return null
-  return { user, mfa: payload.mfa === true }
+  // Le jeton doit désigner une session serveur encore vivante. Un jeton sans
+  // `sid` (émis avant les sessions) n'ouvre plus rien : sa signature reste
+  // valide, mais plus rien ne permettrait de le révoquer.
+  const sid = payload.sid
+  if (!sid || typeof sid !== 'string') return null
+
+  // Une seule requête : la session porte son utilisateur, ce qui remplace la
+  // lecture user d'avant plutôt que de s'y ajouter.
+  const session = await findUsableSession(sid)
+  if (!session) return null
+
+  return { user: session.user, mfa: payload.mfa === true, sessionId: session.id }
 }
 
 export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
   try {
-    const token = extractBearerToken(req.header('authorization'))
+    const token = readAccessToken(req)
     if (!token) {
       throw new AppError(401, 'AUTH_REQUIRED', 'Token manquant ou invalide')
     }
@@ -35,7 +45,12 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       throw new AppError(403, 'USER_BANNED', 'Compte banni')
     }
 
-    req.user = { id: resolved.user.id, mfa: resolved.mfa, twoFactorEnabled: resolved.user.twoFactorEnabled }
+    req.user = {
+      id: resolved.user.id,
+      mfa: resolved.mfa,
+      twoFactorEnabled: resolved.user.twoFactorEnabled,
+      sessionId: resolved.sessionId,
+    }
     next()
   } catch (err) {
     next(err)
@@ -61,7 +76,7 @@ export function requireTotp(req: Request, _res: Response, next: NextFunction) {
 // attempt into a signup that binds the wallet to a fresh orphan account.
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   try {
-    const token = extractBearerToken(req.header('authorization'))
+    const token = readAccessToken(req)
     if (token) {
       const resolved = await resolveUser(token)
       if (!resolved) {
@@ -70,10 +85,32 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       if (resolved.user.isBanned) {
         throw new AppError(403, 'USER_BANNED', 'Compte banni')
       }
-      req.user = { id: resolved.user.id, mfa: resolved.mfa, twoFactorEnabled: resolved.user.twoFactorEnabled }
+      req.user = {
+        id: resolved.user.id,
+        mfa: resolved.mfa,
+        twoFactorEnabled: resolved.user.twoFactorEnabled,
+        sessionId: resolved.sessionId,
+      }
     }
     next()
   } catch (err) {
     next(err)
   }
+}
+
+/**
+ * optionalAuth uniquement pour une liaison de wallet.
+ *
+ * Depuis que la session vit dans un cookie httpOnly, le navigateur la joint à
+ * TOUTES les requêtes, y compris une tentative de connexion. Or optionalAuth
+ * rejette un jeton présenté mais invalide (401) — un cookie périmé ou révoqué
+ * empêchait donc de se reconnecter, notamment juste après une suppression de
+ * compte. L'intention déclarée par le client fait foi : hors liaison, la
+ * signature du wallet EST l'identité, et toute session résiduelle est ignorée.
+ */
+export function optionalAuthForLink(req: Request, res: Response, next: NextFunction) {
+  if ((req.body ?? {}).intent !== 'link') {
+    return next()
+  }
+  return optionalAuth(req, res, next)
 }

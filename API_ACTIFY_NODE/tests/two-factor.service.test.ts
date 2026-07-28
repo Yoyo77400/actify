@@ -5,6 +5,8 @@ import { generateTotpSecret } from '../utils/totp'
 
 vi.mock('../services/prisma', () => ({
   prisma: {
+    // openSession crée la session serveur qui porte le jeton émis.
+    session: { create: vi.fn(), updateMany: vi.fn() },
     user: { findUnique: vi.fn(), update: vi.fn() },
   },
 }))
@@ -32,6 +34,7 @@ const baseUser = {
 }
 
 beforeEach(() => {
+    vi.mocked(prisma.session.create).mockResolvedValue({ id: 'session-1' } as never)
   vi.clearAllMocks()
   userUpdate.mockResolvedValue({} as never)
 })
@@ -75,14 +78,18 @@ describe('confirmTwoFactor', () => {
     expect(result).toEqual({ enabled: true })
     expect(userUpdate).toHaveBeenCalledWith({
       where: { id: USER_ID },
-      data: { twoFactorEnabled: true },
+      data: { twoFactorEnabled: true, totpFailedAttempts: 0, totpLockedUntil: null },
     })
   })
 
   it('rejects an incorrect code and does not enable', async () => {
     userFindUnique.mockResolvedValue({ ...baseUser, twoFactorSecret: generateTotpSecret() } as never)
     await expect(confirmTwoFactor(USER_ID, '000000')).rejects.toThrow(AppError)
-    expect(userUpdate).not.toHaveBeenCalled()
+    // L'échec est bien enregistré (compteur de verrouillage), mais la 2FA ne
+    // doit surtout pas s'activer sur un code faux.
+    expect(userUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ twoFactorEnabled: true }) }),
+    )
   })
 
   it('rejects when no enrollment is in progress', async () => {
@@ -130,5 +137,77 @@ describe('verifyLoginTotp', () => {
   it('requires both a pending token and a code', async () => {
     await expect(verifyLoginTotp('', '123456')).rejects.toThrow(AppError)
     await expect(verifyLoginTotp(signPendingTotpToken(USER_ID), '')).rejects.toThrow(AppError)
+  })
+})
+
+// Le rate limit par IP est contournable en distribuant l'attaque : ce verrou-ci
+// suit le COMPTE visé, dernière ligne quand un wallet est compromis.
+describe('verrouillage TOTP par compte', () => {
+  const secret = generateTotpSecret()
+
+  function lockedUser(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'user-1',
+      deletedAt: null,
+      isBanned: false,
+      username: 'alice',
+      twoFactorEnabled: true,
+      twoFactorSecret: secret,
+      totpFailedAttempts: 0,
+      totpLockedUntil: null,
+      ...overrides,
+    }
+  }
+
+  it('refuse toute vérification tant que le compte est verrouillé', async () => {
+    userFindUnique.mockResolvedValue(lockedUser({ totpLockedUntil: new Date(Date.now() + 60_000) }) as never)
+
+    await expect(verifyLoginTotp(signPendingTotpToken('user-1'), '000000')).rejects.toMatchObject({
+      status: 429,
+      code: 'TOTP_LOCKED',
+    })
+  })
+
+  it('laisse repasser une fois le verrou expiré', async () => {
+    userFindUnique.mockResolvedValue(lockedUser({ totpLockedUntil: new Date(Date.now() - 1) }) as never)
+
+    // Code faux : on vérifie seulement que le verrou ne bloque plus en amont.
+    await expect(verifyLoginTotp(signPendingTotpToken('user-1'), '000000')).rejects.toMatchObject({
+      code: 'TWO_FACTOR_INVALID_CODE',
+    })
+  })
+
+  it('compte les échecs et verrouille au seuil', async () => {
+    userFindUnique.mockResolvedValue(lockedUser({ totpFailedAttempts: 3 }) as never)
+    await expect(verifyLoginTotp(signPendingTotpToken('user-1'), '000000')).rejects.toMatchObject({
+      code: 'TWO_FACTOR_INVALID_CODE',
+    })
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { totpFailedAttempts: 4, totpLockedUntil: undefined },
+    })
+
+    userUpdate.mockClear()
+    userFindUnique.mockResolvedValue(lockedUser({ totpFailedAttempts: 4 }) as never)
+    await expect(verifyLoginTotp(signPendingTotpToken('user-1'), '000000')).rejects.toMatchObject({
+      code: 'TWO_FACTOR_INVALID_CODE',
+    })
+    // 5e échec : verrouillage, et le compteur repart de zéro.
+    const data = userUpdate.mock.calls[0]![0]!.data as { totpFailedAttempts: number; totpLockedUntil: Date }
+    expect(data.totpFailedAttempts).toBe(0)
+    expect(data.totpLockedUntil.getTime()).toBeGreaterThan(Date.now())
+  })
+
+  it('remet le compteur à zéro après un code valide', async () => {
+    userFindUnique.mockResolvedValue(lockedUser({ totpFailedAttempts: 4 }) as never)
+
+    await verifyLoginTotp(signPendingTotpToken('user-1'), authenticator.generate(secret))
+
+    // Sans cette remise à zéro, quatre erreurs anciennes verrouilleraient le
+    // compte à la prochaine faute de frappe.
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { totpFailedAttempts: 0, totpLockedUntil: null },
+    })
   })
 })
