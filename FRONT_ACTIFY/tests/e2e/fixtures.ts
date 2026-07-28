@@ -30,9 +30,7 @@ export const test = base_test.extend<{
   },
 
   page: async ({ page, wallet, walletSeed }, use) => {
-    await page.addInitScript((seed) => {
-      ;(window as unknown as { __ACTIFY_E2E_WALLET__?: { seed: string } }).__ACTIFY_E2E_WALLET__ = { seed }
-    }, walletSeed ?? wallet.seed)
+    await setWallet(page, walletSeed ?? wallet.seed)
     // Answer the cookie banner up front: it is fixed to the bottom of every
     // page and swallows clicks aimed at the content behind it. 'rejected' keeps
     // the Umami plugin from injecting its external script.
@@ -42,6 +40,19 @@ export const test = base_test.extend<{
     await use(page)
   },
 })
+
+/**
+ * Injects window.__ACTIFY_E2E_WALLET__ before any app code runs (see
+ * app/lib/wallets/e2e.ts). addInitScript calls stack and each re-runs on every
+ * subsequent navigation, so calling this again later with a different seed
+ * (e.g. to switch accounts mid-test) overrides the earlier one from then on -
+ * used by specs that need more than one account (see artists-follow.spec.ts).
+ */
+export async function setWallet(page: Page, seed: string) {
+  await page.addInitScript((s) => {
+    ;(window as unknown as { __ACTIFY_E2E_WALLET__?: { seed: string } }).__ACTIFY_E2E_WALLET__ = { seed: s }
+  }, seed)
+}
 
 // Mirrors playwright.config.ts's FRONT_PORT — cookies must be scoped to an
 // origin, and the config can't be imported here without a cycle.

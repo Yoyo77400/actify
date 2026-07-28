@@ -21,8 +21,20 @@
         >
           <Icon name="ph:user" class="text-3xl text-muted" />
         </div>
-        <div>
-          <h1 class="ethnocentric m-0 text-[clamp(28px,4vw,44px)]">{{ name }}</h1>
+        <div class="flex-1">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <h1 class="ethnocentric m-0 text-[clamp(28px,4vw,44px)]">{{ name }}</h1>
+            <button
+              v-if="canFollow"
+              type="button"
+              class="text-sm px-4 shrink-0"
+              :class="isFollowing ? 'ghost-btn' : 'primary-btn'"
+              :disabled="toggling"
+              @click="toggleFollow"
+            >
+              {{ isFollowing ? 'Suivi ✓' : 'Suivre' }}
+            </button>
+          </div>
           <div class="flex gap-2.5 flex-wrap mt-2.5">
             <span v-if="artist.username" class="pill-badge">@{{ artist.username }}</span>
             <span class="pill-badge">Inscrit le {{ joinedLabel }}</span>
@@ -30,6 +42,7 @@
               <Icon name="ph:seal-check" class="text-sm" />
               Vérifié
             </span>
+            <span class="pill-badge">{{ artist.stats.followersCount }} abonné{{ artist.stats.followersCount > 1 ? 's' : '' }}</span>
           </div>
         </div>
       </div>
@@ -42,6 +55,9 @@ import type { PublicProfile } from '~/types/marketplace'
 
 const props = defineProps<{ artist: PublicProfile }>()
 
+const { user, isLoggedIn } = useAuth()
+const follows = useFollows()
+
 const name = computed(() => props.artist.displayName ?? props.artist.username ?? 'Artiste')
 
 // Avatar served by our own API — no third-party gateway (privacy policy).
@@ -51,4 +67,33 @@ const avatarUrl = computed(() => fileUrl(props.artist.avatarCid))
 const joinedLabel = computed(() =>
   new Date(props.artist.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'Europe/Paris' }),
 )
+
+// No self-follow, and logged-out visitors get a "Se connecter" link instead
+// of a button that would just 401.
+const canFollow = computed(() => isLoggedIn.value && user.value?.id !== props.artist.id)
+
+const isFollowing = ref(false)
+const toggling = ref(false)
+watch(() => props.artist, (a) => {
+  isFollowing.value = a.isFollowing
+}, { immediate: true })
+
+async function toggleFollow() {
+  const username = props.artist.username
+  if (!username || toggling.value) return
+  toggling.value = true
+  try {
+    if (isFollowing.value) {
+      await follows.unfollow(username)
+      isFollowing.value = false
+    } else {
+      await follows.follow(username)
+      isFollowing.value = true
+    }
+  } catch {
+    // Best-effort toggle: on failure the button simply stays as it was.
+  } finally {
+    toggling.value = false
+  }
+}
 </script>

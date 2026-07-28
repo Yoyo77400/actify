@@ -22,8 +22,8 @@
           <p class="m-0 mt-1 text-muted text-sm">{{ user.username }}</p>
           <div class="flex gap-2.5 flex-wrap mt-2.5">
             <span class="pill-badge">Joined {{ user.joinedAt }}</span>
-            <span class="pill-badge">{{ user.followersCount.toLocaleString() }} followers</span>
-            <span class="pill-badge">{{ user.followingCount }} following</span>
+            <span class="pill-badge">{{ user.followersCount.toLocaleString() }} abonné{{ user.followersCount > 1 ? 's' : '' }}</span>
+            <span class="pill-badge">{{ user.followingCount }} abonnement{{ user.followingCount > 1 ? 's' : '' }}</span>
           </div>
         </div>
         <button

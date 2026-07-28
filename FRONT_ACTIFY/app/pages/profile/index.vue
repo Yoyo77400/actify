@@ -142,10 +142,6 @@ watch(editing, (open) => {
   if (!open) refreshListings()
 })
 
-function shortAddress(address: string) {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`
-}
-
 // Adapts the API profile to the view-model the profile components consume.
 // Collections/activity stay empty until listings & purchases land in the API.
 const view = computed<UserProfile | null>(() => {
@@ -164,8 +160,8 @@ const view = computed<UserProfile | null>(() => {
     cover: profileBannerImage(me.bannerCid),
     bio: me.bio ?? '',
     joinedAt: new Date(me.createdAt).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
-    followersCount: 0,
-    followingCount: 0,
+    followersCount: me.stats.followersCount,
+    followingCount: me.stats.followingCount,
     wallet: {
       address: primary ? shortAddress(primary.address) : 'Aucun wallet',
       balance: '—',
