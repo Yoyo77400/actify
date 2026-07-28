@@ -71,6 +71,20 @@ export interface CategoryWithCount {
   listingCount: number
 }
 
+/** Body of PUT /assets/:id - off-chain listing fields only. */
+export interface UpdateAssetBody {
+  title?: string
+  shortDescription?: string | null
+  description?: string | null
+  tags?: string[]
+  distributionMode?: string
+  maxDownloads?: number | null
+  isFree?: boolean
+  basePrice?: number | null
+  currency?: string | null
+  royaltyBps?: number | null
+}
+
 export interface CreateAssetBody {
   title: string
   description?: string | null
