@@ -45,7 +45,23 @@
 
         <div class="surface p-5 flex flex-col gap-4">
           <div class="flex flex-col gap-2">
-            <h1 class="ethnocentric text-foreground text-xl leading-snug">{{ asset.title }}</h1>
+            <div class="flex items-start justify-between gap-3">
+              <h1 class="ethnocentric text-foreground text-xl leading-snug">{{ asset.title }}</h1>
+              <button
+                v-if="isLoggedIn"
+                type="button"
+                class="ghost-btn !min-h-9 !w-9 !p-0 shrink-0 flex items-center justify-center"
+                :aria-label="isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+                :disabled="togglingFavorite"
+                @click="toggleFavorite"
+              >
+                <Icon
+                  :name="isFavorited ? 'ph:heart-fill' : 'ph:heart'"
+                  class="text-lg"
+                  :class="isFavorited ? 'text-danger' : ''"
+                />
+              </button>
+            </div>
 
             <p class="text-sm text-muted">
               Par
@@ -387,6 +403,7 @@ const route = useRoute()
 const assets = useAssets()
 const orders = useOrders()
 const downloads = useDownloads()
+const favorites = useFavorites()
 const { step: payStep, pay, hasSignedPayment, forgetSignedPayment } = usePayOrder()
 const { user, isLoggedIn } = useAuth()
 
@@ -462,6 +479,33 @@ const stars = computed(() => {
 })
 
 const isOwner = computed(() => !!user.value && user.value.id === asset.value?.seller.id)
+
+// ─── Favorite ───
+const isFavorited = ref(false)
+const togglingFavorite = ref(false)
+watch(asset, (a) => {
+  if (a) isFavorited.value = a.isFavorited
+}, { immediate: true })
+
+async function toggleFavorite() {
+  const a = asset.value
+  if (!a || togglingFavorite.value) return
+  togglingFavorite.value = true
+  try {
+    if (isFavorited.value) {
+      await favorites.remove(a.id)
+      isFavorited.value = false
+    } else {
+      await favorites.add(a.id)
+      isFavorited.value = true
+    }
+  } catch {
+    // Best-effort toggle: on failure the icon simply stays as it was: no
+    // dedicated error UI for a low-stakes action the user can just retry.
+  } finally {
+    togglingFavorite.value = false
+  }
+}
 
 function truncateMiddle(value: string, head = 10, tail = 8): string {
   if (value.length <= head + tail + 1) return value

@@ -3,8 +3,8 @@ import { AppError } from '../utils/http'
 
 vi.mock('../services/prisma', () => ({
   prisma: {
-    listing: { findFirst: vi.fn() },
-    favorite: { upsert: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    listing: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    favorite: { upsert: vi.fn(), deleteMany: vi.fn() },
   },
 }))
 
@@ -12,10 +12,10 @@ import { prisma } from '../services/prisma'
 import { addFavorite, listMyFavorites, removeFavorite } from '../services/favorites.service'
 
 const listingFindFirst = vi.mocked(prisma.listing.findFirst)
+const listingFindMany = vi.mocked(prisma.listing.findMany)
+const listingCount = vi.mocked(prisma.listing.count)
 const favoriteUpsert = vi.mocked(prisma.favorite.upsert)
 const favoriteDeleteMany = vi.mocked(prisma.favorite.deleteMany)
-const favoriteFindMany = vi.mocked(prisma.favorite.findMany)
-const favoriteCount = vi.mocked(prisma.favorite.count)
 
 const publishedListing = { id: 'listing-1', status: 'Published', deletedAt: null }
 const pagination = { page: 1, limit: 20, skip: 0 }
@@ -80,70 +80,73 @@ describe('removeFavorite', () => {
 })
 
 describe('listMyFavorites', () => {
-  const addedAt = new Date('2026-01-02T00:00:00.000Z')
-  const listing = {
+  // Full shape expected by assets.service's serializeListing (shared via queryListings).
+  const listingRow = {
     id: 'listing-1',
     slug: 'ui-kit',
     title: 'UI Kit',
     shortDescription: 'Un kit UI complet',
-    description: 'internal-only field that must not leak',
+    description: null,
     thumbnailCid: 'cid-thumb',
     isFree: false,
     price: 10,
-    currency: 'EUR',
+    currency: 'XRP',
+    distributionMode: 'unlimited',
+    maxDownloads: null,
+    royaltyPercentage: null,
     status: 'Published',
+    viewsCount: 0,
+    salesCount: 0,
+    fileIpfsCid: null,
+    nft: null,
+    createdAt: new Date('2026-01-02T00:00:00.000Z'),
+    seller: { id: 'seller-1', username: 'alice', displayName: 'Alice' },
+    listingCategories: [],
+    listingTags: [],
   }
 
-  it('returns public card fields plus addedAt, newest first, published only', async () => {
-    favoriteFindMany.mockResolvedValue([{ userId: 'user-1', listingId: 'listing-1', addedAt, listing }] as never)
-    favoriteCount.mockResolvedValue(1)
+  it('lists only this user\'s favorited, published listings, using the shared card serializer', async () => {
+    listingFindMany.mockResolvedValue([listingRow] as never)
+    listingCount.mockResolvedValue(1)
 
-    const { items, meta } = await listMyFavorites('user-1', pagination)
+    const { items, meta } = await listMyFavorites('user-1', {}, pagination)
 
-    expect(items).toEqual([
-      {
-        id: 'listing-1',
-        slug: 'ui-kit',
-        title: 'UI Kit',
-        shortDescription: 'Un kit UI complet',
-        thumbnailCid: 'cid-thumb',
-        isFree: false,
-        price: 10,
-        currency: 'EUR',
-        status: 'Published',
-        addedAt,
-      },
-    ])
+    expect(items).toEqual([expect.objectContaining({ id: 'listing-1', title: 'UI Kit', currency: 'XRP' })])
     expect(meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 })
 
-    const expectedWhere = { userId: 'user-1', listing: { status: 'Published', deletedAt: null } }
-    expect(favoriteFindMany).toHaveBeenCalledWith({
-      where: expectedWhere,
-      include: { listing: true },
-      orderBy: { addedAt: 'desc' },
-      skip: 0,
-      take: 20,
-    })
-    expect(favoriteCount).toHaveBeenCalledWith({ where: expectedWhere })
+    const expectedWhere = { status: 'Published', deletedAt: null, favorites: { some: { userId: 'user-1' } } }
+    expect(listingFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expectedWhere }))
+    expect(listingCount).toHaveBeenCalledWith({ where: expectedWhere })
   })
 
   it('returns an empty page with a zero total when nothing is favorited', async () => {
-    favoriteFindMany.mockResolvedValue([] as never)
-    favoriteCount.mockResolvedValue(0)
+    listingFindMany.mockResolvedValue([] as never)
+    listingCount.mockResolvedValue(0)
 
-    const { items, meta } = await listMyFavorites('user-1', pagination)
+    const { items, meta } = await listMyFavorites('user-1', {}, pagination)
 
     expect(items).toEqual([])
     expect(meta).toEqual({ page: 1, limit: 20, total: 0, totalPages: 1 })
   })
 
   it('applies the requested pagination window', async () => {
-    favoriteFindMany.mockResolvedValue([] as never)
-    favoriteCount.mockResolvedValue(45)
+    listingFindMany.mockResolvedValue([] as never)
+    listingCount.mockResolvedValue(45)
 
-    const { meta } = await listMyFavorites('user-1', { page: 3, limit: 10, skip: 20 })
+    const { meta } = await listMyFavorites('user-1', {}, { page: 3, limit: 10, skip: 20 })
 
-    expect(favoriteFindMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 20, take: 10 }))
+    expect(listingFindMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 20, take: 10 }))
     expect(meta).toEqual({ page: 3, limit: 10, total: 45, totalPages: 5 })
+  })
+
+  it('applies search/filter params (e.g. isFree) on top of the favorites scope', async () => {
+    listingFindMany.mockResolvedValue([] as never)
+    listingCount.mockResolvedValue(0)
+
+    await listMyFavorites('user-1', { isFree: true }, pagination)
+
+    expect(listingFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { status: 'Published', deletedAt: null, favorites: { some: { userId: 'user-1' } }, isFree: true },
+    }))
   })
 })

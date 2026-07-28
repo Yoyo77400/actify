@@ -366,11 +366,18 @@ export async function getAssetByIdOrSlug(idOrSlug: string, viewerUserId: string 
     ? await resolveEntitlement(viewerUserId, listing)
     : null
 
+  const isFavorited = viewerUserId != null
+    ? (await prisma.favorite.findUnique({
+        where: { userId_listingId: { userId: viewerUserId, listingId: listing.id } },
+      })) != null
+    : false
+
   return {
     ...serializeListing(listing),
     averageRating: rating._avg.rating != null ? Number(rating._avg.rating.toFixed(2)) : null,
     reviewsCount: rating._count._all,
     viewerEntitlement: { canDownload: reason != null, reason },
+    isFavorited,
   }
 }
 
@@ -433,7 +440,7 @@ export async function listAssets(filters: AssetListFilters, pagination: Paginati
   return queryListings({ status: PUBLISHED, deletedAt: null }, filters, pagination)
 }
 
-async function queryListings(baseWhere: Record<string, unknown>, filters: AssetListFilters, pagination: Pagination) {
+export async function queryListings(baseWhere: Record<string, unknown>, filters: AssetListFilters, pagination: Pagination) {
   const where = { ...baseWhere, ...buildFilterConditions(filters) }
   const order = filters.order === 'asc' ? 'asc' : 'desc'
 
