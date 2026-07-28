@@ -107,7 +107,8 @@ export async function getMe(userId: string) {
   }
 }
 
-export async function updateMe(userId: string, input: UpdateMeInput) {
+// Shared by the user's own profile edit and the admin moderation edit.
+async function applyUserUpdate(userId: string, input: UpdateMeInput) {
   const data: Record<string, string | null> = {}
 
   if (input.username !== undefined) {
@@ -149,13 +150,28 @@ export async function updateMe(userId: string, input: UpdateMeInput) {
     data.bannerCid = input.bannerCid
   }
 
-  const user = await prisma.user.update({
+  return prisma.user.update({
     where: { id: userId },
     data,
     include: { role: true, wallets: true },
   })
+}
 
-  return serializeMe(user)
+export async function updateMe(userId: string, input: UpdateMeInput) {
+  return serializeMe(await applyUserUpdate(userId, input))
+}
+
+// Admin moderation: identity fields only (username/displayName/bio) - never
+// the wallet list, and never role/ban status, which already have their own
+// dedicated, more carefully-guarded actions.
+export async function adminUpdateUser(userId: string, input: Pick<UpdateMeInput, 'username' | 'displayName' | 'bio'>) {
+  const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
+  if (!exists) {
+    throw new AppError(404, 'NOT_FOUND', 'Utilisateur introuvable')
+  }
+
+  const updated = await applyUserUpdate(userId, input)
+  return { id: updated.id, username: updated.username, displayName: updated.displayName, bio: updated.bio }
 }
 
 export async function softDeleteMe(userId: string) {

@@ -79,6 +79,30 @@ export interface AdminOrder {
   purchasedAt: string
 }
 
+/** Body of PUT /admin/users/:id - identity fields only, never the wallet list. */
+export interface AdminUserUpdateBody {
+  username?: string | null
+  displayName?: string | null
+  bio?: string | null
+}
+
+/**
+ * Body of PUT /admin/assets/:id - off-chain listing fields only. Whatever's
+ * already minted on-chain (see AssetNft) is immutable and never part of this.
+ */
+export interface AdminAssetUpdateBody {
+  title?: string
+  shortDescription?: string | null
+  description?: string | null
+  tags?: string[]
+  distributionMode?: string
+  maxDownloads?: number | null
+  isFree?: boolean
+  basePrice?: number | null
+  currency?: string | null
+  royaltyBps?: number | null
+}
+
 /** GET /admin/stats. byStatus keys: Draft / Published / Archived / Suspended. */
 export interface AdminStats {
   totalUsers: number

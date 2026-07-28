@@ -1,22 +1,27 @@
 <template>
   <div class="flex flex-col gap-5">
-    <!-- No search bar: GET /admin/orders only supports a status filter. -->
-    <div>
-      <h1 class="ethnocentric m-0 text-2xl">Ventes</h1>
-      <p class="mt-1 mb-0 text-muted text-sm">{{ meta?.total ?? 0 }} commande{{ (meta?.total ?? 0) > 1 ? 's' : '' }}</p>
+    <div class="flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
+      <div>
+        <h1 class="ethnocentric m-0 text-2xl">Ventes</h1>
+        <p class="mt-1 mb-0 text-muted text-sm">{{ meta?.total ?? 0 }} commande{{ (meta?.total ?? 0) > 1 ? 's' : '' }}</p>
+      </div>
+      <AdminSearchBar v-model="q" placeholder="Rechercher (acheteur, asset, tx hash)..." />
     </div>
 
-    <div class="flex gap-2 scroll-x">
-      <button
-        v-for="f in filters"
-        :key="f.label"
-        class="chip shrink-0"
-        :class="{ 'chip--active': filter === f.value }"
-        type="button"
-        @click="filter = f.value"
-      >
-        {{ f.label }}
-      </button>
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex gap-2 scroll-x">
+        <button
+          v-for="f in filters"
+          :key="f.label"
+          class="chip shrink-0"
+          :class="{ 'chip--active': filter === f.value }"
+          type="button"
+          @click="filter = f.value"
+        >
+          {{ f.label }}
+        </button>
+      </div>
+      <AdminDateRangeFilter v-model="dateRange" />
     </div>
 
     <p v-if="errorMsg" class="surface p-4 text-danger text-sm" role="alert">{{ errorMsg }}</p>
@@ -52,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import type { DateRangeValue } from '~/components/admin/AdminDateRangeFilter.vue'
 import type { AdminOrder, AdminOrderStatus, PageMeta } from '~/types/admin'
 import type { AdminOrderListParams } from '~/composables/useAdminApi'
 
@@ -62,7 +68,9 @@ useHead({ title: 'Ventes' })
 
 const adminApi = useAdminApi()
 
+const q = ref('')
 const filter = ref<AdminOrderStatus | undefined>(undefined)
+const dateRange = ref<DateRangeValue>({})
 const page = ref(1)
 
 const orders = ref<AdminOrder[]>([])
@@ -78,7 +86,14 @@ const filters: Array<{ label: string; value: AdminOrderStatus | undefined }> = [
 ]
 
 function buildParams(): AdminOrderListParams {
-  return { status: filter.value, page: page.value, limit: PAGE_SIZE }
+  return {
+    status: filter.value,
+    q: q.value || undefined,
+    from: dateRange.value.from,
+    to: dateRange.value.to,
+    page: page.value,
+    limit: PAGE_SIZE,
+  }
 }
 
 // Monotonic token: discard stale responses after a filter change mid-flight.
@@ -120,9 +135,19 @@ if (first.value?.ok) {
   errorMsg.value = first.value.message
 }
 
-watch(filter, () => {
+watch([filter, dateRange], () => {
   page.value = 1
   fetchOrders()
+})
+
+// Debounce keystrokes so typing doesn't fire one request per character.
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+watch(q, () => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    page.value = 1
+    fetchOrders()
+  }, 300)
 })
 
 function goToPage(target: number) {
