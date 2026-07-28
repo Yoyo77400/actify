@@ -8,17 +8,20 @@
       <AdminSearchBar v-model="q" placeholder="Rechercher (username, email)..." />
     </div>
 
-    <div class="flex gap-2 scroll-x">
-      <button
-        v-for="f in filters"
-        :key="f.value"
-        class="chip shrink-0"
-        :class="{ 'chip--active': filter === f.value }"
-        type="button"
-        @click="filter = f.value"
-      >
-        {{ f.label }}
-      </button>
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex gap-2 scroll-x">
+        <button
+          v-for="f in filters"
+          :key="f.value"
+          class="chip shrink-0"
+          :class="{ 'chip--active': filter === f.value }"
+          type="button"
+          @click="filter = f.value"
+        >
+          {{ f.label }}
+        </button>
+      </div>
+      <AdminDateRangeFilter v-model="dateRange" />
     </div>
 
     <p v-if="errorMsg" class="surface p-4 text-danger text-sm" role="alert">{{ errorMsg }}</p>
@@ -32,6 +35,7 @@
         @unban="onUnban"
         @promote="onPromote"
         @demote="onDemote"
+        @edit="editingUserId = $event"
       />
       <AdminEmptyState
         v-if="!users.length && !loading && !errorMsg"
@@ -39,6 +43,12 @@
         icon="ph:users"
       />
     </div>
+
+    <AdminUserEditModal
+      :user-id="editingUserId"
+      @close="editingUserId = null"
+      @saved="editingUserId = null; fetchUsers()"
+    />
 
     <div v-if="loading" class="flex justify-center py-4">
       <span class="w-6 h-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
@@ -62,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import type { DateRangeValue } from '~/components/admin/AdminDateRangeFilter.vue'
 import type { AdminUser, PageMeta } from '~/types/admin'
 import type { AdminUserListParams } from '~/composables/useAdminApi'
 
@@ -77,7 +88,9 @@ const store = useAdminStore()
 
 const q = ref('')
 const filter = ref<UserFilter>('all')
+const dateRange = ref<DateRangeValue>({})
 const page = ref(1)
+const editingUserId = ref<string | null>(null)
 
 const users = ref<AdminUser[]>([])
 const meta = ref<PageMeta | null>(null)
@@ -97,6 +110,8 @@ function buildParams(): AdminUserListParams {
     q: q.value || undefined,
     banned: filter.value === 'active' ? false : filter.value === 'banned' ? true : undefined,
     role: filter.value === 'admin' ? 'admin' : undefined,
+    from: dateRange.value.from,
+    to: dateRange.value.to,
     page: page.value,
     limit: PAGE_SIZE,
   }
@@ -163,7 +178,7 @@ watch(q, () => {
   }, 300)
 })
 
-watch(filter, () => {
+watch([filter, dateRange], () => {
   page.value = 1
   fetchUsers()
 })

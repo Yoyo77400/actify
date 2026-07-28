@@ -2,12 +2,15 @@ import { FetchError } from 'ofetch'
 import type {
   AdminAsset,
   AdminAssetStatus,
+  AdminAssetUpdateBody,
   AdminOrder,
   AdminStats,
   AdminUser,
   AdminUserDetail,
+  AdminUserUpdateBody,
   PageMeta,
 } from '~/types/admin'
+import type { AssetCard } from '~/types/asset'
 
 const REQUEST_TIMEOUT_MS = 15_000
 
@@ -15,6 +18,9 @@ const REQUEST_TIMEOUT_MS = 15_000
 export interface AdminAssetListParams {
   status?: AdminAssetStatus
   sellerId?: string
+  q?: string
+  from?: string
+  to?: string
   page?: number
   limit?: number
 }
@@ -23,12 +29,17 @@ export interface AdminUserListParams {
   q?: string
   banned?: boolean
   role?: string
+  from?: string
+  to?: string
   page?: number
   limit?: number
 }
 
 export interface AdminOrderListParams {
   status?: string
+  q?: string
+  from?: string
+  to?: string
   page?: number
   limit?: number
 }
@@ -96,6 +107,9 @@ export function useAdminApi() {
 
     listAssets: (params: AdminAssetListParams = {}) =>
       listWithMeta<AdminAsset>(`/admin/assets${toQuery(params)}`),
+    getAsset: (id: string) => api.get<AssetCard>(`/admin/assets/${id}`),
+    updateAsset: (id: string, body: AdminAssetUpdateBody) =>
+      api.put<AssetCard>(`/admin/assets/${id}`, body),
     updateAssetStatus: (id: string, status: AdminAssetStatus) =>
       api.put<{ id: string; status: AdminAssetStatus }>(`/admin/assets/${id}/status`, { status }),
     removeAsset: (id: string) =>
@@ -104,6 +118,11 @@ export function useAdminApi() {
     listUsers: (params: AdminUserListParams = {}) =>
       listWithMeta<AdminUser>(`/admin/users${toQuery(params)}`),
     getUser: (id: string) => api.get<AdminUserDetail>(`/admin/users/${id}`),
+    updateUser: (id: string, body: AdminUserUpdateBody) =>
+      api.put<{ id: string; username: string | null; displayName: string | null; bio: string | null }>(
+        `/admin/users/${id}`,
+        body,
+      ),
     banUser: (id: string) => api.post<{ id: string; isBanned: boolean }>(`/admin/users/${id}/ban`),
     unbanUser: (id: string) => api.post<{ id: string; isBanned: boolean }>(`/admin/users/${id}/unban`),
     updateUserRole: (id: string, role: string) =>

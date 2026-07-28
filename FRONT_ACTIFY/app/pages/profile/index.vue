@@ -10,6 +10,13 @@
         <section>
           <CommonSectionHeader title="Mes assets" subtitle="Vos créations publiées et vos brouillons" />
 
+          <AssetFilterBar
+            :categories="categories"
+            search-placeholder="Rechercher dans mes assets..."
+            class="mb-4"
+            @change="onListingsFiltersChange"
+          />
+
           <p v-if="listingsError" class="surface p-8 text-center text-danger text-sm" role="alert">
             Impossible de charger vos assets pour le moment.
           </p>
@@ -21,13 +28,31 @@
                 v-if="item.status !== 'Published'"
                 class="pill-badge absolute top-3 left-3 z-10 bg-panel-3/90"
               >{{ item.status === 'Draft' ? 'Brouillon' : item.status }}</span>
+              <button
+                type="button"
+                class="ghost-btn absolute top-3 right-3 z-10 !min-h-8 !w-8 !p-0 bg-panel-3/90"
+                aria-label="Modifier"
+                @click="editingAsset = item"
+              >
+                <Icon name="ph:pencil-simple" class="text-sm" />
+              </button>
               <ArtistAssetCard :item="item" />
             </div>
           </div>
           <div v-else class="surface p-8 text-center">
-            <p class="text-muted text-sm">Aucun asset pour le moment.</p>
-            <NuxtLink to="/asset/new" class="text-accent text-sm hover:underline">Publier un premier asset</NuxtLink>
+            <p class="text-muted text-sm">
+              {{ hasListingsFilters ? 'Aucun asset ne correspond à ces filtres.' : 'Aucun asset pour le moment.' }}
+            </p>
+            <NuxtLink v-if="!hasListingsFilters" to="/asset/new" class="text-accent text-sm hover:underline">
+              Publier un premier asset
+            </NuxtLink>
           </div>
+
+          <AssetEditModal
+            :asset="editingAsset"
+            @close="editingAsset = null"
+            @saved="editingAsset = null; refreshListings()"
+          />
         </section>
 
         <section>
@@ -55,6 +80,8 @@
 </template>
 
 <script setup lang="ts">
+import type { AssetFilterState } from '~/components/asset/AssetFilterBar.vue'
+import type { AssetCard, CategoryWithCount } from '~/types/asset'
 import type { UserProfile } from '~/types/profile'
 
 definePageMeta({ middleware: 'auth' })
@@ -66,14 +93,50 @@ const assets = useAssets()
 
 const editing = ref(false)
 
+// Same global list the marketplace uses - counts shown are platform-wide, not
+// scoped to this seller, but the categories themselves are still correct to
+// filter by. A failure here must not block the "my assets" section.
+const { data: categories } = await useAsyncData(
+  'profile-categories',
+  () => assets.categories(),
+  { default: () => [] as CategoryWithCount[] },
+)
+
+const listingsFilters = ref<AssetFilterState | null>(null)
+const hasListingsFilters = computed(() => {
+  const f = listingsFilters.value
+  if (!f) return false
+  return !!f.q || f.category !== null || f.isFree !== null || f.minPrice != null || f.maxPrice != null || f.mode !== null
+})
+
 // The owner's own listings — /creator/listings is scoped server-side to the
 // caller (sellerId) and, unlike the public catalogue, includes drafts.
 // Refetched after an edit so a freshly published asset shows up.
 const { data: listingsData, error: listingsError, refresh: refreshListings } = await useAsyncData(
   'profile-listings',
-  () => assets.myListings(),
+  () => {
+    const f = listingsFilters.value
+    return assets.myListings(f
+      ? {
+          q: f.q || undefined,
+          category: f.category ?? undefined,
+          sort: f.sort,
+          order: f.order,
+          isFree: f.isFree ?? undefined,
+          minPrice: f.minPrice ?? undefined,
+          maxPrice: f.maxPrice ?? undefined,
+          mode: f.mode ?? undefined,
+        }
+      : {})
+  },
+  { watch: [listingsFilters] },
 )
 const listings = computed(() => listingsData.value ?? [])
+const editingAsset = ref<AssetCard | null>(null)
+
+function onListingsFiltersChange(next: AssetFilterState) {
+  listingsFilters.value = next
+}
 
 watch(editing, (open) => {
   if (!open) refreshListings()
@@ -98,7 +161,7 @@ const view = computed<UserProfile | null>(() => {
     // fallback — the old ipfs.io URL never resolved (storage is API-local) and
     // the cover was a hardcoded stock photo.
     avatar: avatarImage(me.avatarCid, me.id),
-    cover: bannerImage(me.bannerCid, me.id),
+    cover: profileBannerImage(me.bannerCid),
     bio: me.bio ?? '',
     joinedAt: new Date(me.createdAt).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
     followersCount: 0,

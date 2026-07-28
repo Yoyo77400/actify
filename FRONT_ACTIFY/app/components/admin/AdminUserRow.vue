@@ -33,6 +33,13 @@
         </button>
         <div v-if="menuOpen" class="admin-dropdown" @mouseleave="menuOpen = false">
           <button
+            class="admin-dropdown-item"
+            type="button"
+            @click="emit('edit', user.id); menuOpen = false"
+          >
+            Modifier
+          </button>
+          <button
             v-if="user.isBanned"
             class="admin-dropdown-item text-success"
             type="button"
@@ -80,6 +87,7 @@ const emit = defineEmits<{
   unban: [id: string]
   promote: [id: string]
   demote: [id: string]
+  edit: [id: string]
 }>()
 
 const menuOpen = ref(false)

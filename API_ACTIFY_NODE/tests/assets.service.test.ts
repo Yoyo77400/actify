@@ -16,6 +16,7 @@ vi.mock('../services/prisma', () => ({
     tag: { upsert: vi.fn() },
     category: { count: vi.fn() },
     nft: { findUnique: vi.fn() },
+    favorite: { findUnique: vi.fn() },
     review: { aggregate: vi.fn(), groupBy: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -44,6 +45,7 @@ const tagUpsert = vi.mocked(prisma.tag.upsert)
 const listingTagCreate = vi.mocked(prisma.listingTag.create)
 const categoryCount = vi.mocked(prisma.category.count)
 const nftFindUnique = vi.mocked(prisma.nft.findUnique)
+const favoriteFindUnique = vi.mocked(prisma.favorite.findUnique)
 const reviewAggregate = vi.mocked(prisma.review.aggregate)
 const transaction = vi.mocked(prisma.$transaction)
 const entitlement = vi.mocked(resolveEntitlement)
@@ -97,6 +99,7 @@ beforeEach(() => {
   listingUpdate.mockResolvedValue(fullListing() as never)
   reviewAggregate.mockResolvedValue({ _avg: { rating: null }, _count: { _all: 0 } } as never)
   entitlement.mockResolvedValue(null)
+  favoriteFindUnique.mockResolvedValue(null)
 })
 
 describe('createAsset : validation du titre (valeurs aux limites)', () => {

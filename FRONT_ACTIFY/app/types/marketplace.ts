@@ -32,6 +32,8 @@ export interface PublicListing {
   isFree: boolean
   price: string | null
   currency: string | null
+  distributionMode: string
+  maxDownloads: number | null
   viewsCount: number
   salesCount: number
   createdAt: string

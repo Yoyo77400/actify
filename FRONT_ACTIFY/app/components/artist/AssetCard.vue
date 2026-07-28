@@ -1,12 +1,19 @@
 <template>
   <article class="surface overflow-hidden">
-    <NuxtLink :to="assetLink">
+    <NuxtLink :to="assetLink" class="relative block">
       <img
         class="w-full h-[230px] object-cover bg-panel-3"
         :src="assetImage(item.thumbnailCid, item.id)"
         :alt="item.title"
         loading="lazy"
       >
+      <span
+        v-if="distText"
+        class="pill-badge absolute top-2.5 left-2.5 text-foreground bg-black/60"
+      >
+        <Icon name="ph:stack" class="text-sm" />
+        {{ distText }}
+      </span>
     </NuxtLink>
 
     <div class="p-3.5">
@@ -41,6 +48,7 @@ const props = defineProps<{
 }>()
 
 const assetLink = computed(() => `/assets/${props.item.slug ?? props.item.id}`)
+const distText = computed(() => distributionText(props.item))
 
 const priceLabel = computed(() => {
   if (props.item.isFree) return 'Gratuit'

@@ -10,7 +10,23 @@ function queryString(value: unknown): string | undefined {
 
 export async function getListings(req: Request, res: Response) {
   const pagination = parsePagination(req.query as Record<string, unknown>)
-  const { items, meta } = await assetsService.listMyListings(req.user!.id, pagination)
+  const query = req.query as Record<string, unknown>
+
+  const { items, meta } = await assetsService.listMyListings(
+    req.user!.id,
+    {
+      q: queryString(query.q),
+      category: queryString(query.category),
+      tags: queryString(query.tags),
+      isFree: query.isFree !== undefined ? query.isFree === 'true' : undefined,
+      mode: queryString(query.mode),
+      minPrice: query.minPrice !== undefined ? Number(query.minPrice) : undefined,
+      maxPrice: query.maxPrice !== undefined ? Number(query.maxPrice) : undefined,
+      sort: queryString(query.sort),
+      order: queryString(query.order) === 'asc' ? 'asc' : 'desc',
+    },
+    pagination,
+  )
   sendSuccess(res, items, meta)
 }
 

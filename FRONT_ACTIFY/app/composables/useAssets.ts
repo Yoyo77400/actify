@@ -3,6 +3,7 @@ import type {
   AssetDetail,
   CategoryWithCount,
   CreateAssetBody,
+  UpdateAssetBody,
 } from '~/types/asset'
 
 export interface AssetListParams {
@@ -11,6 +12,9 @@ export interface AssetListParams {
   sort?: 'createdAt' | 'price' | 'rating' | 'sales' | 'views'
   order?: 'asc' | 'desc'
   isFree?: boolean
+  minPrice?: number
+  maxPrice?: number
+  mode?: 'unlimited' | 'limited' | 'unique'
   page?: number
   limit?: number
 }
@@ -34,8 +38,9 @@ export function useAssets() {
     get: (idOrSlug: string) => api.get<AssetDetail>(`/assets/${idOrSlug}`),
     categories: () => api.get<CategoryWithCount[]>('/categories'),
     create: (body: CreateAssetBody) => api.post<AssetCard>('/assets', body),
+    update: (id: string, body: UpdateAssetBody) => api.put<AssetCard>(`/assets/${id}`, body),
     publish: (id: string) => api.post<AssetCard>(`/assets/${id}/publish`),
-    myListings: () => api.get<AssetCard[]>('/creator/listings'),
+    myListings: (params: AssetListParams = {}) => api.get<AssetCard[]>(`/creator/listings${toQuery(params)}`),
     uploadFile: (id: string, file: File) => {
       const fd = new FormData()
       fd.append('file', file)

@@ -56,6 +56,7 @@ export interface AssetDetail extends AssetCard {
   averageRating: number | null
   reviewsCount: number
   viewerEntitlement: ViewerEntitlement
+  isFavorited: boolean
 }
 
 export interface DownloadTicket {
@@ -68,6 +69,20 @@ export interface CategoryWithCount {
   name: string
   slug: string
   listingCount: number
+}
+
+/** Body of PUT /assets/:id - off-chain listing fields only. */
+export interface UpdateAssetBody {
+  title?: string
+  shortDescription?: string | null
+  description?: string | null
+  tags?: string[]
+  distributionMode?: string
+  maxDownloads?: number | null
+  isFree?: boolean
+  basePrice?: number | null
+  currency?: string | null
+  royaltyBps?: number | null
 }
 
 export interface CreateAssetBody {

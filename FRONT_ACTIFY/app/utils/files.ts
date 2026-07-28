@@ -54,7 +54,12 @@ export function avatarImage(avatarCid: string | null | undefined, seed: string):
   return fileUrl(avatarCid) ?? avatarPlaceholder(seed)
 }
 
-/** Profile banner, falling back to the same tile family as asset covers. */
+/** Generic banner-shaped fallback (collection covers etc). */
 export function bannerImage(bannerCid: string | null | undefined, seed: string): string {
   return fileUrl(bannerCid) ?? placeholderImage(seed)
+}
+
+/** A user's profile banner, falling back to the Actify logo when unset. */
+export function profileBannerImage(bannerCid: string | null | undefined): string {
+  return fileUrl(bannerCid) ?? '/actify-rectangular.png'
 }

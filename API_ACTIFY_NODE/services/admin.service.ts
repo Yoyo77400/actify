@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { AppError, buildMeta } from '../utils/http'
+import { buildDateRangeWhere, type DateRangeParams } from '../utils/dateRange'
 import type { Pagination } from '../utils/pagination'
 
 const ARCHIVED = 'Archived'
@@ -14,19 +15,21 @@ const REPORT_RESOLVE_STATUSES = ['Resolved', 'Rejected']
 
 const SELLER_SELECT = { select: { id: true, username: true, displayName: true } } as const
 
-export interface AdminAssetFilters {
+export interface AdminAssetFilters extends DateRangeParams {
   status?: string
   sellerId?: string
+  q?: string
 }
 
-export interface AdminUserFilters {
+export interface AdminUserFilters extends DateRangeParams {
   q?: string
   banned?: boolean
   role?: string
 }
 
-export interface AdminOrderFilters {
+export interface AdminOrderFilters extends DateRangeParams {
   status?: string
+  q?: string
 }
 
 export interface AdminReportFilters {
@@ -100,6 +103,14 @@ export async function listAllAssets(filters: AdminAssetFilters, pagination: Pagi
   const where: Record<string, unknown> = {}
   if (filters.status) where.status = filters.status
   if (filters.sellerId) where.sellerId = filters.sellerId
+  if (filters.q) {
+    where.OR = [
+      { title: { contains: filters.q, mode: 'insensitive' } },
+      { description: { contains: filters.q, mode: 'insensitive' } },
+    ]
+  }
+  const createdAt = buildDateRangeWhere(filters)
+  if (createdAt) where.createdAt = createdAt
 
   const [items, total] = await Promise.all([
     prisma.listing.findMany({
@@ -152,6 +163,8 @@ export async function listUsers(filters: AdminUserFilters, pagination: Paginatio
   }
   if (filters.banned !== undefined) where.isBanned = filters.banned
   if (filters.role) where.role = { name: filters.role }
+  const userCreatedAt = buildDateRangeWhere(filters)
+  if (userCreatedAt) where.createdAt = userCreatedAt
 
   const [items, total] = await Promise.all([
     prisma.user.findMany({
@@ -240,6 +253,16 @@ export async function updateUserRole(actorId: string, userId: string, roleName: 
 export async function listOrders(filters: AdminOrderFilters, pagination: Pagination) {
   const where: Record<string, unknown> = {}
   if (filters.status) where.status = filters.status
+  if (filters.q) {
+    where.OR = [
+      { txHash: { contains: filters.q, mode: 'insensitive' } },
+      { buyer: { username: { contains: filters.q, mode: 'insensitive' } } },
+      { buyer: { displayName: { contains: filters.q, mode: 'insensitive' } } },
+      { listing: { title: { contains: filters.q, mode: 'insensitive' } } },
+    ]
+  }
+  const purchasedAt = buildDateRangeWhere(filters)
+  if (purchasedAt) where.purchasedAt = purchasedAt
 
   const [items, total] = await Promise.all([
     prisma.purchase.findMany({

@@ -1,11 +1,16 @@
 <template>
   <div class="flex flex-col gap-6">
     <div class="flex flex-col gap-1">
-      <h1 class="ethnocentric text-foreground text-2xl">Marketplace</h1>
-      <p class="text-muted text-sm">Parcourez les licences numériques publiées par la communauté Actify.</p>
+      <h1 class="ethnocentric text-foreground text-2xl">Mes favoris</h1>
+      <p class="text-muted text-sm">Retrouvez les assets que vous avez mis de côté.</p>
     </div>
 
-    <AssetFilterBar :categories="categories" :initial="initialFilters" @change="onFiltersChange" />
+    <AssetFilterBar
+      :categories="categories"
+      search-placeholder="Rechercher dans mes favoris..."
+      :initial="initialFilters"
+      @change="onFiltersChange"
+    />
 
     <p v-if="errorMsg" class="surface p-4 text-danger text-sm" role="alert">{{ errorMsg }}</p>
 
@@ -17,9 +22,12 @@
     </div>
 
     <div v-else-if="!loading && !errorMsg" class="surface p-10 flex flex-col items-center gap-3 text-center">
-      <Icon name="ph:package" class="text-3xl text-muted-2" />
-      <p class="text-foreground font-medium">Aucun asset trouvé</p>
-      <p class="text-muted text-sm">Essayez d'ajuster votre recherche ou vos filtres.</p>
+      <Icon name="ph:heart" class="text-3xl text-muted-2" />
+      <p class="text-foreground font-medium">Aucun favori pour le moment</p>
+      <p class="text-muted text-sm">
+        Le cœur sur la page d'un asset l'ajoute ici.
+        <NuxtLink to="/assets" class="text-accent hover:underline">Parcourir le marketplace</NuxtLink>
+      </p>
     </div>
 
     <div v-if="loading" class="flex justify-center py-4">
@@ -40,13 +48,13 @@ import type { AssetCard, CategoryWithCount } from '~/types/asset'
 
 const PAGE_SIZE = 12
 
-useHead({ title: 'Marketplace' })
+definePageMeta({ middleware: 'auth' })
+useHead({ title: 'Mes favoris' })
 
 const route = useRoute()
 const assetsApi = useAssets()
+const favoritesApi = useFavorites()
 
-// Every filter is deep-linkable: shareable/bookmarkable search results, same
-// as browsing a normal shop.
 const initialFilters: Partial<AssetFilterState> = {
   q: typeof route.query.q === 'string' ? route.query.q : undefined,
   category: typeof route.query.category === 'string' ? route.query.category : undefined,
@@ -90,26 +98,23 @@ function buildParams() {
   }
 }
 
-// Categories power the filter chips; a failure here must not block the catalogue.
+// Same global category list the marketplace uses.
 const { data: categories } = await useAsyncData(
-  'market-categories',
+  'favorites-categories',
   () => assetsApi.categories(),
   { default: () => [] as CategoryWithCount[] },
 )
 
-// First page runs during SSR so the grid is populated on initial render.
-const { data: firstPage, error: firstError } = await useAsyncData('market-assets', () =>
-  assetsApi.list(buildParams()),
+const { data: firstPage, error: firstError } = await useAsyncData('favorites-assets', () =>
+  favoritesApi.list(buildParams()),
 )
 
 const items = ref<AssetCard[]>(firstPage.value ?? [])
 reachedEnd.value = (firstPage.value?.length ?? 0) < PAGE_SIZE
 if (firstError.value) {
-  errorMsg.value = toApiError(firstError.value)?.message ?? 'Impossible de charger le catalogue.'
+  errorMsg.value = toApiError(firstError.value)?.message ?? 'Impossible de charger vos favoris.'
 }
 
-// Monotonic token: a slow append that resolves after a reset (user changed
-// filter/sort mid-load) is discarded instead of clobbering the new list.
 let requestSeq = 0
 
 async function fetchPage(reset: boolean) {
@@ -117,13 +122,13 @@ async function fetchPage(reset: boolean) {
   loading.value = true
   errorMsg.value = null
   try {
-    const batch = await assetsApi.list(buildParams())
+    const batch = await favoritesApi.list(buildParams())
     if (seq !== requestSeq) return
     items.value = reset ? batch : [...items.value, ...batch]
     reachedEnd.value = batch.length < PAGE_SIZE
   } catch (err) {
     if (seq !== requestSeq) return
-    errorMsg.value = toApiError(err)?.message ?? 'Impossible de charger le catalogue.'
+    errorMsg.value = toApiError(err)?.message ?? 'Impossible de charger vos favoris.'
   } finally {
     if (seq === requestSeq) loading.value = false
   }
@@ -134,8 +139,6 @@ function loadMore() {
   fetchPage(false)
 }
 
-// AssetFilterBar already debounces text/number inputs internally; any change
-// it emits (search, sort, category, price range, free/paid) resets pagination.
 function onFiltersChange(next: AssetFilterState) {
   filters.value = next
   page.value = 1

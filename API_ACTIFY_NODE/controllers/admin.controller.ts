@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express'
 import * as adminService from '../services/admin.service'
+import * as assetsService from '../services/assets.service'
+import * as usersService from '../services/users.service'
 import { sendSuccess } from '../utils/http'
 import { parsePagination } from '../utils/pagination'
 
@@ -12,7 +14,13 @@ export async function listAssets(req: Request, res: Response) {
   const query = req.query as Record<string, unknown>
 
   const { items, meta } = await adminService.listAllAssets(
-    { status: queryString(query.status), sellerId: queryString(query.sellerId) },
+    {
+      status: queryString(query.status),
+      sellerId: queryString(query.sellerId),
+      q: queryString(query.q),
+      from: queryString(query.from),
+      to: queryString(query.to),
+    },
     pagination,
   )
 
@@ -22,6 +30,32 @@ export async function listAssets(req: Request, res: Response) {
 export async function updateAssetStatus(req: Request, res: Response) {
   const body = req.body ?? {}
   const result = await adminService.updateAssetStatus(String(req.params.id), body.status)
+  sendSuccess(res, result)
+}
+
+// Full editable listing shape, for the admin edit form to prefill.
+export async function getAsset(req: Request, res: Response) {
+  sendSuccess(res, await assetsService.getAssetForAdmin(String(req.params.id)))
+}
+
+// Moderation edit: off-chain listing fields only (title/description/price/...).
+// Whatever's already minted on-chain (see the Nft model) stays immutable -
+// this never touches it.
+export async function updateAsset(req: Request, res: Response) {
+  const body = req.body ?? {}
+  const result = await assetsService.adminUpdateAsset(String(req.params.id), {
+    title: body.title,
+    description: body.description,
+    shortDescription: body.shortDescription,
+    tags: body.tags,
+    categoryIds: body.categoryIds,
+    distributionMode: body.distributionMode,
+    maxDownloads: body.maxDownloads,
+    isFree: body.isFree,
+    basePrice: body.basePrice,
+    currency: body.currency,
+    royaltyBps: body.royaltyBps,
+  })
   sendSuccess(res, result)
 }
 
@@ -39,6 +73,8 @@ export async function listUsers(req: Request, res: Response) {
       q: queryString(query.q),
       banned: query.banned !== undefined ? query.banned === 'true' : undefined,
       role: queryString(query.role),
+      from: queryString(query.from),
+      to: queryString(query.to),
     },
     pagination,
   )
@@ -48,6 +84,18 @@ export async function listUsers(req: Request, res: Response) {
 
 export async function getUser(req: Request, res: Response) {
   sendSuccess(res, await adminService.getUserDetail(String(req.params.id)))
+}
+
+// Identity fields only (username/displayName/bio) - never the wallet list,
+// never role/ban (those already have their own dedicated actions below).
+export async function updateUser(req: Request, res: Response) {
+  const body = req.body ?? {}
+  const result = await usersService.adminUpdateUser(String(req.params.id), {
+    username: body.username,
+    displayName: body.displayName,
+    bio: body.bio,
+  })
+  sendSuccess(res, result)
 }
 
 export async function banUser(req: Request, res: Response) {
@@ -68,7 +116,15 @@ export async function listOrders(req: Request, res: Response) {
   const pagination = parsePagination(req.query as Record<string, unknown>)
   const query = req.query as Record<string, unknown>
 
-  const { items, meta } = await adminService.listOrders({ status: queryString(query.status) }, pagination)
+  const { items, meta } = await adminService.listOrders(
+    {
+      status: queryString(query.status),
+      q: queryString(query.q),
+      from: queryString(query.from),
+      to: queryString(query.to),
+    },
+    pagination,
+  )
 
   sendSuccess(res, items, meta)
 }
