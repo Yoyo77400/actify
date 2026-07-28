@@ -30,6 +30,24 @@
       </div>
     </section>
 
+    <section v-if="featuredArtists.length">
+      <CommonSectionHeader title="Artistes en vedette" subtitle="Les créateurs les plus suivis du moment">
+        <template #actions>
+          <NuxtLink to="/artists" class="ghost-btn text-sm">Tout voir</NuxtLink>
+        </template>
+      </CommonSectionHeader>
+      <div class="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1 gap-4">
+        <ArtistDirectoryCard
+          v-for="creator in featuredArtists"
+          :key="creator.id"
+          :creator="creator"
+          :can-follow="canFollow(creator)"
+          :toggling="togglingId === creator.id"
+          @toggle="toggleFollow(creator)"
+        />
+      </div>
+    </section>
+
     <section v-if="categories.length">
       <CommonSectionHeader title="Catégories" subtitle="Trouvez ce qui vous inspire" />
       <div class="scroll-x flex gap-2.5">
@@ -75,8 +93,11 @@
 
 <script setup lang="ts">
 import type { AssetCard, CategoryWithCount } from '~/types/asset'
+import type { CreatorCard } from '~/types/marketplace'
 
 const assetsApi = useAssets()
+const marketplaceApi = useMarketplaceApi()
+const { canFollow, toggleFollow, togglingId } = useCreatorFollowToggle()
 
 // One SSR round-trip for the whole landing; each source degrades to an empty
 // list independently (allSettled) so a partial API outage still renders the
@@ -84,15 +105,17 @@ const assetsApi = useAssets()
 const { data } = await useAsyncData(
   'home-landing',
   async () => {
-    const [categories, latest, trending] = await Promise.allSettled([
+    const [categories, latest, trending, featuredArtists] = await Promise.allSettled([
       assetsApi.categories(),
       assetsApi.list({ sort: 'createdAt', limit: 8 }),
       assetsApi.list({ sort: 'views', limit: 8 }),
+      marketplaceApi.listCreators({ sort: 'followers', limit: 8 }),
     ])
     return {
       categories: categories.status === 'fulfilled' ? categories.value : [],
       latest: latest.status === 'fulfilled' ? latest.value : [],
       trending: trending.status === 'fulfilled' ? trending.value : [],
+      featuredArtists: featuredArtists.status === 'fulfilled' ? featuredArtists.value : [],
     }
   },
   {
@@ -100,6 +123,7 @@ const { data } = await useAsyncData(
       categories: [] as CategoryWithCount[],
       latest: [] as AssetCard[],
       trending: [] as AssetCard[],
+      featuredArtists: [] as CreatorCard[],
     }),
   },
 )
@@ -107,6 +131,7 @@ const { data } = await useAsyncData(
 const categories = computed(() => data.value?.categories ?? [])
 const latest = computed(() => data.value?.latest ?? [])
 const trending = computed(() => data.value?.trending ?? [])
+const featuredArtists = computed(() => data.value?.featuredArtists ?? [])
 
 useHead({
   title: 'Accueil',

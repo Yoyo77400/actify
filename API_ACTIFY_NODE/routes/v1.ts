@@ -8,6 +8,7 @@ import { categoriesRouter } from './categories.routes'
 import { collectionsRouter } from './collections.routes'
 import { reviewsRouter, assetReviewsRouter } from './reviews.routes'
 import { assetFavoritesRouter, meFavoritesRouter } from './favorites.routes'
+import { meFollowingRouter, userFollowRouter } from './follows.routes'
 import { ordersRouter } from './orders.routes'
 import { downloadsRouter } from './downloads.routes'
 import { filesRouter } from './files.routes'
@@ -39,8 +40,11 @@ v1Router.use('/assets', assetReviewsRouter)
 v1Router.use('/assets', assetFavoritesRouter)
 v1Router.use('/assets', assetsRouter)
 
-// Same trick: '/me/favorites' must win over usersRouter's GET '/:username'.
+// Same trick: '/me/favorites' and '/me/following' must win over usersRouter's
+// GET '/:username'.
 v1Router.use('/users', meFavoritesRouter)
+v1Router.use('/users', meFollowingRouter)
+v1Router.use('/users', userFollowRouter)
 v1Router.use('/users', usersRouter)
 
 v1Router.use('/wallets', walletsRouter)

@@ -25,8 +25,27 @@ export async function exportMyData(req: Request, res: Response) {
 }
 
 export async function getPublicProfile(req: Request, res: Response) {
-  const profile = await usersService.getPublicProfile(String(req.params.username))
+  const profile = await usersService.getPublicProfile(String(req.params.username), req.user?.id ?? null)
   sendSuccess(res, profile)
+}
+
+export async function listCreators(req: Request, res: Response) {
+  const pagination = parsePagination(req.query as Record<string, unknown>)
+  const query = req.query as Record<string, unknown>
+  const q = typeof query.q === 'string' && query.q.length > 0 ? query.q : undefined
+  const sort = query.sort === 'followers' ? 'followers' : undefined
+
+  const { items, meta } = await usersService.listCreators({ q, sort }, pagination, req.user?.id ?? null)
+  sendSuccess(res, items, meta)
+}
+
+export async function listFollowing(req: Request, res: Response) {
+  const pagination = parsePagination(req.query as Record<string, unknown>)
+  const query = req.query as Record<string, unknown>
+  const q = typeof query.q === 'string' && query.q.length > 0 ? query.q : undefined
+
+  const { items, meta } = await usersService.listFollowing(req.user!.id, { q }, pagination)
+  sendSuccess(res, items, meta)
 }
 
 export async function listUserAssets(req: Request, res: Response) {

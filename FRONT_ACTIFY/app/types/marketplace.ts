@@ -4,6 +4,8 @@
 export interface PublicProfileStats {
   listingsCount: number
   reviewsCount: number
+  followersCount: number
+  followingCount: number
 }
 
 export interface PublicProfile {
@@ -16,6 +18,24 @@ export interface PublicProfile {
   isVerified: boolean
   createdAt: string
   stats: PublicProfileStats
+  /** Whether the current viewer follows this artist - always false when logged out. */
+  isFollowing: boolean
+}
+
+// Item of GET /users (the artist directory) - see users.service.listCreators.
+export interface CreatorCard {
+  id: string
+  username: string | null
+  displayName: string | null
+  bio: string | null
+  avatarCid: string | null
+  bannerCid: string | null
+  isVerified: boolean
+  createdAt: string
+  listingsCount: number
+  followersCount: number
+  primaryWalletAddress: string | null
+  isFollowing: boolean
 }
 
 // Item of GET /users/:username/assets: whitelisted public columns only

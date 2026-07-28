@@ -1,9 +1,16 @@
-import type { PublicListing, PublicProfile } from '~/types/marketplace'
+import type { CreatorCard, PublicListing, PublicProfile } from '~/types/marketplace'
 
 // Public artist pages: profile + published assets, both anonymous-friendly
 // (see API users.routes — GET /users/:username and /users/:username/assets).
 
 export interface ProfileAssetsParams {
+  page?: number
+  limit?: number
+}
+
+export interface CreatorListParams {
+  q?: string
+  sort?: 'createdAt' | 'followers'
   page?: number
   limit?: number
 }
@@ -26,5 +33,6 @@ export function useMarketplaceApi() {
     profile: (username: string) => api.get<PublicProfile>(`/users/${username}`),
     profileAssets: (username: string, params: ProfileAssetsParams = {}) =>
       api.get<PublicListing[]>(`/users/${username}/assets${toQuery(params)}`),
+    listCreators: (params: CreatorListParams = {}) => api.get<CreatorCard[]>(`/users${toQuery(params)}`),
   }
 }
