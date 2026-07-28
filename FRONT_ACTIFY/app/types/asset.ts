@@ -56,6 +56,7 @@ export interface AssetDetail extends AssetCard {
   averageRating: number | null
   reviewsCount: number
   viewerEntitlement: ViewerEntitlement
+  isFavorited: boolean
 }
 
 export interface DownloadTicket {

@@ -203,9 +203,16 @@ export async function createAsset(userId: string, input: CreateAssetInput) {
   return serializeListing(await getFullListingOrThrow(listing.id))
 }
 
-export async function updateAsset(userId: string, listingId: string, input: UpdateAssetInput) {
-  await getOwnedListingOrThrow(userId, listingId)
-
+// Shared by the seller's own edit and the admin moderation edit. Never
+// touches fileIpfsCid/thumbnailCid (separate upload endpoints), status
+// (separate moderation action), or the minted Nft row - once tokenized, the
+// on-chain record is immutable by design; only this off-chain listing data
+// (title, description, price, tags...) can ever change after a mint.
+async function applyAssetUpdate(
+  listingId: string,
+  input: Omit<UpdateAssetInput, 'collectionId'>,
+  collectionId?: number | null,
+) {
   const data: Record<string, unknown> = {}
 
   if (input.title !== undefined) {
@@ -219,12 +226,7 @@ export async function updateAsset(userId: string, listingId: string, input: Upda
 
   if (input.shortDescription !== undefined) data.shortDescription = input.shortDescription
   if (input.description !== undefined) data.description = input.description
-
-  // Guarded in the collections service: attaching an asset to someone else's
-  // collection would let anyone inject listings into it.
-  if (input.collectionId !== undefined) {
-    data.collectionId = await assertAssignableCollection(userId, input.collectionId)
-  }
+  if (collectionId !== undefined) data.collectionId = collectionId
 
   if (input.distributionMode !== undefined) {
     validateDistributionMode(input.distributionMode)
@@ -261,6 +263,41 @@ export async function updateAsset(userId: string, listingId: string, input: Upda
     }
   })
 
+  return serializeListing(await getFullListingOrThrow(listingId))
+}
+
+export async function updateAsset(userId: string, listingId: string, input: UpdateAssetInput) {
+  await getOwnedListingOrThrow(userId, listingId)
+
+  // Guarded in the collections service: attaching an asset to someone else's
+  // collection would let anyone inject listings into it. Resolved up front,
+  // outside the shared transaction, since it needs the caller's userId.
+  const collectionId = input.collectionId !== undefined
+    ? await assertAssignableCollection(userId, input.collectionId)
+    : undefined
+
+  return applyAssetUpdate(listingId, input, collectionId)
+}
+
+// Admin moderation: same off-chain fields as the seller's own edit, on any
+// listing regardless of owner - deliberately excludes collectionId, which is
+// a seller-ownership concept (assertAssignableCollection needs a caller id).
+export async function adminUpdateAsset(listingId: string, input: Omit<UpdateAssetInput, 'collectionId'>) {
+  const listing = await prisma.listing.findFirst({ where: { id: listingId, deletedAt: null } })
+  if (!listing) {
+    throw new AppError(404, 'NOT_FOUND', 'Asset introuvable')
+  }
+
+  return applyAssetUpdate(listingId, input)
+}
+
+// Full editable shape (same as the public/owner detail) for the admin edit
+// form - any status, regardless of owner.
+export async function getAssetForAdmin(listingId: string) {
+  const exists = await prisma.listing.findUnique({ where: { id: listingId }, select: { id: true } })
+  if (!exists) {
+    throw new AppError(404, 'NOT_FOUND', 'Asset introuvable')
+  }
   return serializeListing(await getFullListingOrThrow(listingId))
 }
 
@@ -329,11 +366,18 @@ export async function getAssetByIdOrSlug(idOrSlug: string, viewerUserId: string 
     ? await resolveEntitlement(viewerUserId, listing)
     : null
 
+  const isFavorited = viewerUserId != null
+    ? (await prisma.favorite.findUnique({
+        where: { userId_listingId: { userId: viewerUserId, listingId: listing.id } },
+      })) != null
+    : false
+
   return {
     ...serializeListing(listing),
     averageRating: rating._avg.rating != null ? Number(rating._avg.rating.toFixed(2)) : null,
     reviewsCount: rating._count._all,
     viewerEntitlement: { canDownload: reason != null, reason },
+    isFavorited,
   }
 }
 
@@ -396,7 +440,7 @@ export async function listAssets(filters: AssetListFilters, pagination: Paginati
   return queryListings({ status: PUBLISHED, deletedAt: null }, filters, pagination)
 }
 
-async function queryListings(baseWhere: Record<string, unknown>, filters: AssetListFilters, pagination: Pagination) {
+export async function queryListings(baseWhere: Record<string, unknown>, filters: AssetListFilters, pagination: Pagination) {
   const where = { ...baseWhere, ...buildFilterConditions(filters) }
   const order = filters.order === 'asc' ? 'asc' : 'desc'
 

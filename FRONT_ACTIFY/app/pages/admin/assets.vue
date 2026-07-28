@@ -1,22 +1,27 @@
 <template>
   <div class="flex flex-col gap-5">
-    <!-- No search bar: GET /admin/assets has no text-search param (status/sellerId only). -->
-    <div>
-      <h1 class="ethnocentric m-0 text-2xl">Assets</h1>
-      <p class="mt-1 mb-0 text-muted text-sm">{{ meta?.total ?? 0 }} assets numériques</p>
+    <div class="flex items-center justify-between gap-4 max-sm:flex-col max-sm:items-stretch">
+      <div>
+        <h1 class="ethnocentric m-0 text-2xl">Assets</h1>
+        <p class="mt-1 mb-0 text-muted text-sm">{{ meta?.total ?? 0 }} assets numériques</p>
+      </div>
+      <AdminSearchBar v-model="q" placeholder="Rechercher (titre, description)..." />
     </div>
 
-    <div class="flex gap-2 scroll-x">
-      <button
-        v-for="f in filters"
-        :key="f.label"
-        class="chip shrink-0"
-        :class="{ 'chip--active': filter === f.value }"
-        type="button"
-        @click="filter = f.value"
-      >
-        {{ f.label }}
-      </button>
+    <div class="flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex gap-2 scroll-x">
+        <button
+          v-for="f in filters"
+          :key="f.label"
+          class="chip shrink-0"
+          :class="{ 'chip--active': filter === f.value }"
+          type="button"
+          @click="filter = f.value"
+        >
+          {{ f.label }}
+        </button>
+      </div>
+      <AdminDateRangeFilter v-model="dateRange" />
     </div>
 
     <p v-if="errorMsg" class="surface p-4 text-danger text-sm" role="alert">{{ errorMsg }}</p>
@@ -28,6 +33,7 @@
         :asset="asset"
         @set-status="onSetStatus"
         @remove="onRemove"
+        @edit="editingAssetId = $event"
       />
       <AdminEmptyState
         v-if="!assets.length && !loading && !errorMsg"
@@ -35,6 +41,12 @@
         icon="ph:cube"
       />
     </div>
+
+    <AdminAssetEditModal
+      :asset-id="editingAssetId"
+      @close="editingAssetId = null"
+      @saved="editingAssetId = null; fetchAssets()"
+    />
 
     <div v-if="loading" class="flex justify-center py-4">
       <span class="w-6 h-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
@@ -58,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import type { DateRangeValue } from '~/components/admin/AdminDateRangeFilter.vue'
 import type { AdminAsset, AdminAssetStatus, PageMeta } from '~/types/admin'
 import type { AdminAssetListParams } from '~/composables/useAdminApi'
 
@@ -69,8 +82,11 @@ useHead({ title: 'Assets' })
 const adminApi = useAdminApi()
 const store = useAdminStore()
 
+const q = ref('')
 const filter = ref<AdminAssetStatus | undefined>(undefined)
+const dateRange = ref<DateRangeValue>({})
 const page = ref(1)
+const editingAssetId = ref<string | null>(null)
 
 const assets = ref<AdminAsset[]>([])
 const meta = ref<PageMeta | null>(null)
@@ -86,7 +102,14 @@ const filters: Array<{ label: string; value: AdminAssetStatus | undefined }> = [
 ]
 
 function buildParams(): AdminAssetListParams {
-  return { status: filter.value, page: page.value, limit: PAGE_SIZE }
+  return {
+    status: filter.value,
+    q: q.value || undefined,
+    from: dateRange.value.from,
+    to: dateRange.value.to,
+    page: page.value,
+    limit: PAGE_SIZE,
+  }
 }
 
 // Monotonic token: discard stale responses after a filter change mid-flight.
@@ -138,9 +161,19 @@ if (first.value?.ok) {
   errorMsg.value = first.value.message
 }
 
-watch(filter, () => {
+watch([filter, dateRange], () => {
   page.value = 1
   fetchAssets()
+})
+
+// Debounce keystrokes so typing doesn't fire one request per character.
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+watch(q, () => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    page.value = 1
+    fetchAssets()
+  }, 300)
 })
 
 function goToPage(target: number) {

@@ -34,6 +34,13 @@
         </button>
         <div v-if="menuOpen" class="admin-dropdown" @mouseleave="menuOpen = false">
           <button
+            class="admin-dropdown-item"
+            type="button"
+            @click="emit('edit', asset.id); menuOpen = false"
+          >
+            Modifier
+          </button>
+          <button
             v-if="asset.status !== 'Published'"
             class="admin-dropdown-item text-success"
             type="button"
@@ -78,6 +85,7 @@ const props = defineProps<{ asset: AdminAsset }>()
 const emit = defineEmits<{
   'set-status': [id: string, status: AdminAssetStatus]
   'remove': [id: string]
+  'edit': [id: string]
 }>()
 
 const menuOpen = ref(false)
