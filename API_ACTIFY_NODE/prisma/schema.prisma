@@ -59,7 +59,12 @@ model User {
   notifications    Notification[]
   consents         Consent[]
   collections      Collection[]
+  // Artists this user follows / users following this user as an artist.
+  following        Follow[]       @relation("Following")
+  followers        Follow[]       @relation("Followers")
+
   sessions         Session[]
+
 
   @@map("users")
 }
@@ -345,6 +350,21 @@ model Favorite {
   @@map("favorites")
 }
 
+
+model Follow {
+  followerId  String   @map("follower_id")
+  followingId String   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower  User @relation("Following", fields: [followerId], references: [id])
+  following User @relation("Followers", fields: [followingId], references: [id])
+
+  @@id([followerId, followingId])
+  // The composite PK covers follower_id lookups (feed/following list); this
+  // covers the reverse (followers count/list on a profile).
+  @@index([followingId])
+  @@map("follows")
+}
 
 model Resale {
   id                String   @id @default(uuid())

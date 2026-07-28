@@ -89,6 +89,7 @@ const mainItems: SidebarItem[] = [
   { label: 'Découvrir', to: '/', icon: 'ph:compass' },
   { label: 'Assets', to: '/assets', icon: 'ph:cube' },
   { label: 'Collections', to: '/collections', icon: 'ph:squares-four' },
+  { label: 'Artistes', to: '/artists', icon: 'ph:users' },
   { label: 'Favoris', to: '/favorites', icon: 'ph:heart' },
   { label: 'Publier', to: '/asset/new', icon: 'ph:plus-circle' },
 ]

@@ -60,4 +60,15 @@ export const WALLET_POOLS = {
     { seed: 'sEdVGKUxd8Z6APeuezWeSozTct86Zpj', address: 'rwMwU9bkFUGUedau6yJrZ3i8Sev5RCWpxm' },
     { seed: 'sEd71bCWgB6Us7btWoji1dNxie95LVA', address: 'rBvDGR3fSEnFSUJQVdNTaPW76GCVyPXHr7' },
   ],
+  // Two roles per attempt (artist, follower) — indexed [retry*2] / [retry*2+1]
+  // in artists-follow.spec.ts, rather than one wallet per attempt like the
+  // pools above.
+  artists: [
+    { seed: 'sEdTtNqvJVRw6ZQSAvhX3RRTcZXTFuB', address: 'r98nwMMrPVCmocHBmxJCD2YbPcD9bpyyzc' },
+    { seed: 'sEdSbBL6DNC7Gt7FEN1bafWxVQvRq8p', address: 'rwbM6G7fjxP3qADjEByBWv3nbQ1vRLzBzY' },
+    { seed: 'sEdTxVxK9iDXtGDZQdQvQJR5md5u6yQ', address: 'rhLvPEtEsYzXLSrZ6aG5Qbj2WyDTHyYw3H' },
+    { seed: 'sEdTvxj9q5TX7wctNvTHD9apxcGJ8cJ', address: 'r4ddzqMm2iJ7c2JT21nHLdV6hUPnTibhGY' },
+    { seed: 'sEdVhj3GFuqQYjtNSMz6geCtG3Pf8Fn', address: 'rLTNpe9MSfLgm32gW17fyPxmhGHcD764ea' },
+    { seed: 'sEdSSJLMXrWGEF3WfPCk3pHNkmG4PoM', address: 'rDrVd6UvrhL9aj4mvJjSQxCWzwKPefBZiK' },
+  ],
 } satisfies Record<string, E2eAccount[]>

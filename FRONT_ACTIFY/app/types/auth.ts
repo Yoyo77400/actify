@@ -21,6 +21,8 @@ export interface MeStats {
   downloadsCount: number
   reviewsCount: number
   favoritesCount: number
+  followersCount: number
+  followingCount: number
 }
 
 export interface MeProfile {

@@ -94,17 +94,20 @@ export async function getMe(userId: string) {
     include: { role: true, wallets: true },
   })
 
-  const [listingsCount, purchasesCount, downloadsCount, reviewsCount, favoritesCount] = await Promise.all([
-    prisma.listing.count({ where: { sellerId: userId } }),
-    prisma.purchase.count({ where: { buyerId: userId } }),
-    prisma.download.count({ where: { userId } }),
-    prisma.review.count({ where: { reviewerId: userId } }),
-    prisma.favorite.count({ where: { userId } }),
-  ])
+  const [listingsCount, purchasesCount, downloadsCount, reviewsCount, favoritesCount, followersCount, followingCount] =
+    await Promise.all([
+      prisma.listing.count({ where: { sellerId: userId } }),
+      prisma.purchase.count({ where: { buyerId: userId } }),
+      prisma.download.count({ where: { userId } }),
+      prisma.review.count({ where: { reviewerId: userId } }),
+      prisma.favorite.count({ where: { userId } }),
+      prisma.follow.count({ where: { followingId: userId } }),
+      prisma.follow.count({ where: { followerId: userId } }),
+    ])
 
   return {
     ...serializeMe(user),
-    stats: { listingsCount, purchasesCount, downloadsCount, reviewsCount, favoritesCount },
+    stats: { listingsCount, purchasesCount, downloadsCount, reviewsCount, favoritesCount, followersCount, followingCount },
   }
 }
 
@@ -225,15 +228,155 @@ export async function exportMyData(userId: string) {
   }
 }
 
-export async function getPublicProfile(username: string) {
+export async function getPublicProfile(username: string, viewerId: string | null) {
   const user = await findActiveUserByUsername(username)
 
-  const [listingsCount, reviewsCount] = await Promise.all([
+  const [listingsCount, reviewsCount, followersCount, followingCount, isFollowing] = await Promise.all([
     prisma.listing.count({ where: { sellerId: user.id, status: PUBLISHED, deletedAt: null } }),
     prisma.review.count({ where: { reviewerId: user.id } }),
+    prisma.follow.count({ where: { followingId: user.id } }),
+    prisma.follow.count({ where: { followerId: user.id } }),
+    viewerId == null
+      ? Promise.resolve(false)
+      : prisma.follow
+          .findUnique({ where: { followerId_followingId: { followerId: viewerId, followingId: user.id } } })
+          .then((f) => f != null),
   ])
 
-  return { ...serializePublic(user), stats: { listingsCount, reviewsCount } }
+  return {
+    ...serializePublic(user),
+    stats: { listingsCount, reviewsCount, followersCount, followingCount },
+    isFollowing,
+  }
+}
+
+export interface CreatorListFilters {
+  q?: string
+  /** 'followers' powers the homepage's "featured creators" widget. */
+  sort?: 'createdAt' | 'followers'
+}
+
+function serializeCreatorCard(user: {
+  id: string
+  username: string | null
+  displayName: string | null
+  bio: string | null
+  avatarCid: string | null
+  bannerCid: string | null
+  isVerified: boolean
+  createdAt: Date
+  wallets: { address: string }[]
+  _count: { listings: number; followers: number }
+}) {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    bio: user.bio,
+    avatarCid: user.avatarCid,
+    bannerCid: user.bannerCid,
+    isVerified: user.isVerified,
+    createdAt: user.createdAt,
+    listingsCount: user._count.listings,
+    followersCount: user._count.followers,
+    // XRPL addresses are public by design (they're how buyers pay a seller,
+    // and mint transactions are already inspectable on-ledger) - surfacing
+    // the primary one here is not a new exposure.
+    primaryWalletAddress: user.wallets[0]?.address ?? null,
+  }
+}
+
+const CREATOR_CARD_INCLUDE = {
+  wallets: { where: { isPrimary: true }, take: 1, select: { address: true } },
+  _count: {
+    select: {
+      listings: { where: { status: PUBLISHED, deletedAt: null } },
+      followers: true,
+    },
+  },
+} as const
+
+// The public "artist directory": any active, non-banned user with at least
+// one published listing — there's no separate creator role/flag to gate on.
+export async function listCreators(filters: CreatorListFilters, pagination: Pagination, viewerId: string | null) {
+  const where: Record<string, unknown> = {
+    deletedAt: null,
+    isBanned: false,
+    listings: { some: { status: PUBLISHED, deletedAt: null } },
+  }
+  if (filters.q) {
+    where.OR = [
+      { username: { contains: filters.q, mode: 'insensitive' } },
+      { displayName: { contains: filters.q, mode: 'insensitive' } },
+    ]
+  }
+
+  const orderBy = filters.sort === 'followers'
+    ? { followers: { _count: 'desc' as const } }
+    : { createdAt: 'desc' as const }
+
+  const [rows, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      include: CREATOR_CARD_INCLUDE,
+      orderBy,
+      skip: pagination.skip,
+      take: pagination.limit,
+    }),
+    prisma.user.count({ where }),
+  ])
+
+  // Batch-resolve which of this page's creators the viewer already follows,
+  // instead of one query per row.
+  let followingIds = new Set<string>()
+  if (viewerId != null && rows.length > 0) {
+    const follows = await prisma.follow.findMany({
+      where: { followerId: viewerId, followingId: { in: rows.map((r) => r.id) } },
+      select: { followingId: true },
+    })
+    followingIds = new Set(follows.map((f) => f.followingId))
+  }
+
+  const items = rows.map((user) => ({ ...serializeCreatorCard(user), isFollowing: followingIds.has(user.id) }))
+
+  return { items, meta: buildMeta(pagination.page, pagination.limit, total) }
+}
+
+export interface FollowingListFilters {
+  q?: string
+}
+
+// "Mes abonnements": everyone this user follows, regardless of whether
+// they've published anything yet — unlike listCreators, which is the public
+// discovery directory and only surfaces people with published listings.
+export async function listFollowing(userId: string, filters: FollowingListFilters, pagination: Pagination) {
+  const where: Record<string, unknown> = {
+    deletedAt: null,
+    followers: { some: { followerId: userId } },
+  }
+  if (filters.q) {
+    where.OR = [
+      { username: { contains: filters.q, mode: 'insensitive' } },
+      { displayName: { contains: filters.q, mode: 'insensitive' } },
+    ]
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      include: CREATOR_CARD_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      skip: pagination.skip,
+      take: pagination.limit,
+    }),
+    prisma.user.count({ where }),
+  ])
+
+  // Every row here is, by construction (the where clause above), already
+  // followed by the caller.
+  const items = rows.map((user) => ({ ...serializeCreatorCard(user), isFollowing: true }))
+
+  return { items, meta: buildMeta(pagination.page, pagination.limit, total) }
 }
 
 export async function listUserAssets(username: string, pagination: Pagination) {

@@ -8,6 +8,7 @@ vi.mock('../services/prisma', () => ({
     download: { count: vi.fn() },
     review: { count: vi.fn() },
     favorite: { count: vi.fn() },
+    follow: { count: vi.fn() },
   },
 }))
 
@@ -184,6 +185,9 @@ describe('getMe', () => {
     vi.mocked(prisma.download.count).mockResolvedValue(7)
     vi.mocked(prisma.review.count).mockResolvedValue(1)
     vi.mocked(prisma.favorite.count).mockResolvedValue(5)
+    // Promise.all evaluates the array left to right: followersCount's
+    // follow.count() call fires before followingCount's.
+    vi.mocked(prisma.follow.count).mockResolvedValueOnce(4).mockResolvedValueOnce(6)
   })
 
   it('renvoie le profil accompagné de ses compteurs', async () => {
@@ -196,6 +200,8 @@ describe('getMe', () => {
       downloadsCount: 7,
       reviewsCount: 1,
       favoritesCount: 5,
+      followersCount: 4,
+      followingCount: 6,
     })
   })
 
@@ -211,5 +217,7 @@ describe('getMe', () => {
     expect(prisma.listing.count).toHaveBeenCalledWith({ where: { sellerId: USER_ID } })
     expect(prisma.purchase.count).toHaveBeenCalledWith({ where: { buyerId: USER_ID } })
     expect(prisma.review.count).toHaveBeenCalledWith({ where: { reviewerId: USER_ID } })
+    expect(prisma.follow.count).toHaveBeenCalledWith({ where: { followingId: USER_ID } })
+    expect(prisma.follow.count).toHaveBeenCalledWith({ where: { followerId: USER_ID } })
   })
 })

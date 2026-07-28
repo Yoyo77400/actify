@@ -1,5 +1,10 @@
 <template>
   <div class="flex flex-col gap-7">
+    <NuxtLink to="/artists" class="inline-flex items-center gap-1.5 text-muted text-sm hover:text-foreground transition-colors w-fit">
+      <Icon name="ph:arrow-left" class="text-base" />
+      Retour aux artistes
+    </NuxtLink>
+
     <!-- Not found -->
     <div v-if="loadError?.notFound" class="surface p-10 flex flex-col items-center gap-3 text-center">
       <Icon name="ph:magnifying-glass" class="text-3xl text-muted" />
