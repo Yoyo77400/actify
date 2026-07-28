@@ -5,44 +5,7 @@
       <p class="text-muted text-sm">Parcourez les licences numériques publiées par la communauté Actify.</p>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3">
-      <div class="relative flex-1 min-w-[220px]">
-        <Icon name="ph:magnifying-glass" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-2" />
-        <input
-          v-model.trim="q"
-          type="search"
-          placeholder="Rechercher un asset..."
-          class="input !pl-10"
-          aria-label="Rechercher un asset"
-        >
-      </div>
-      <select v-model="sort" class="select max-w-[200px]" aria-label="Trier">
-        <option value="createdAt">Plus récents</option>
-        <option value="views">Popularité</option>
-        <option value="rating">Mieux notés</option>
-        <option value="price">Prix</option>
-      </select>
-    </div>
-
-    <div class="scroll-x flex gap-2 items-center">
-      <button
-        type="button"
-        class="chip shrink-0"
-        :class="{ 'chip--active': activeCategory === null }"
-        @click="activeCategory = null"
-      >Tous</button>
-      <button
-        v-for="cat in categories"
-        :key="cat.id"
-        type="button"
-        class="chip shrink-0"
-        :class="{ 'chip--active': activeCategory === cat.slug }"
-        @click="activeCategory = cat.slug"
-      >
-        {{ cat.name }}
-        <span class="text-muted-2 ml-1">{{ cat.listingCount }}</span>
-      </button>
-    </div>
+    <AssetFilterBar :categories="categories" :initial="initialFilters" @change="onFiltersChange" />
 
     <p v-if="errorMsg" class="surface p-4 text-danger text-sm" role="alert">{{ errorMsg }}</p>
 
@@ -72,9 +35,8 @@
 </template>
 
 <script setup lang="ts">
+import type { AssetFilterState } from '~/components/asset/AssetFilterBar.vue'
 import type { AssetCard, CategoryWithCount } from '~/types/asset'
-
-type SortKey = 'createdAt' | 'price' | 'views' | 'rating'
 
 const PAGE_SIZE = 12
 
@@ -83,17 +45,29 @@ useHead({ title: 'Marketplace' })
 const route = useRoute()
 const assetsApi = useAssets()
 
-const q = ref(typeof route.query.q === 'string' ? route.query.q : '')
-const activeCategory = ref<string | null>(
-  typeof route.query.category === 'string' ? route.query.category : null,
-)
-const SORT_KEYS: readonly SortKey[] = ['createdAt', 'price', 'views', 'rating']
-const querySort = route.query.sort
-const sort = ref<SortKey>(
-  typeof querySort === 'string' && (SORT_KEYS as readonly string[]).includes(querySort)
-    ? (querySort as SortKey)
-    : 'createdAt',
-)
+// Every filter is deep-linkable: shareable/bookmarkable search results, same
+// as browsing a normal shop.
+const initialFilters: Partial<AssetFilterState> = {
+  q: typeof route.query.q === 'string' ? route.query.q : undefined,
+  category: typeof route.query.category === 'string' ? route.query.category : undefined,
+  sort: typeof route.query.sort === 'string' ? (route.query.sort as AssetFilterState['sort']) : undefined,
+  order: route.query.order === 'asc' ? 'asc' : route.query.order === 'desc' ? 'desc' : undefined,
+  isFree: route.query.isFree === 'true' ? true : route.query.isFree === 'false' ? false : undefined,
+  minPrice: typeof route.query.minPrice === 'string' && route.query.minPrice !== '' ? Number(route.query.minPrice) : undefined,
+  maxPrice: typeof route.query.maxPrice === 'string' && route.query.maxPrice !== '' ? Number(route.query.maxPrice) : undefined,
+  mode: typeof route.query.mode === 'string' ? (route.query.mode as AssetFilterState['mode']) : undefined,
+}
+
+const filters = ref<AssetFilterState>({
+  q: initialFilters.q ?? '',
+  category: initialFilters.category ?? null,
+  sort: initialFilters.sort ?? 'createdAt',
+  order: initialFilters.order ?? 'desc',
+  isFree: initialFilters.isFree ?? null,
+  minPrice: initialFilters.minPrice ?? null,
+  maxPrice: initialFilters.maxPrice ?? null,
+  mode: initialFilters.mode ?? null,
+})
 const page = ref(1)
 
 const loading = ref(false)
@@ -101,10 +75,16 @@ const reachedEnd = ref(false)
 const errorMsg = ref<string | null>(null)
 
 function buildParams() {
+  const f = filters.value
   return {
-    q: q.value || undefined,
-    category: activeCategory.value ?? undefined,
-    sort: sort.value,
+    q: f.q || undefined,
+    category: f.category ?? undefined,
+    sort: f.sort,
+    order: f.order,
+    isFree: f.isFree ?? undefined,
+    minPrice: f.minPrice ?? undefined,
+    maxPrice: f.maxPrice ?? undefined,
+    mode: f.mode ?? undefined,
     page: page.value,
     limit: PAGE_SIZE,
   }
@@ -154,19 +134,11 @@ function loadMore() {
   fetchPage(false)
 }
 
-// Debounce keystrokes so typing in the search box doesn't fire a request per character.
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-watch(q, () => {
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    page.value = 1
-    fetchPage(true)
-  }, 300)
-})
-
-// Category / sort changes reset pagination and refetch immediately.
-watch([activeCategory, sort], () => {
+// AssetFilterBar already debounces text/number inputs internally; any change
+// it emits (search, sort, category, price range, free/paid) resets pagination.
+function onFiltersChange(next: AssetFilterState) {
+  filters.value = next
   page.value = 1
   fetchPage(true)
-})
+}
 </script>

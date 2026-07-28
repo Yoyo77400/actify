@@ -44,6 +44,8 @@ const LISTING_CARD_SELECT = {
   isFree: true,
   price: true,
   currency: true,
+  distributionMode: true,
+  maxDownloads: true,
   viewsCount: true,
   salesCount: true,
   createdAt: true,

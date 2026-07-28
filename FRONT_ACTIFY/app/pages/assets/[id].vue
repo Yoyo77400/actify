@@ -27,12 +27,20 @@
     <section v-else-if="asset" class="grid grid-cols-[minmax(0,1fr)_360px] max-lg:grid-cols-1 gap-[18px] items-start">
       <!-- Main column -->
       <div class="flex flex-col gap-[18px]">
-        <div class="surface overflow-hidden">
+        <div class="surface overflow-hidden group relative cursor-zoom-in" @click="lightboxOpen = true">
           <img
             class="w-full aspect-[3/2] object-cover bg-panel-3"
             :src="thumbnailUrl"
             :alt="asset.title"
           >
+          <span
+            class="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors"
+          >
+            <Icon
+              name="ph:magnifying-glass-plus"
+              class="text-2xl text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            />
+          </span>
         </div>
 
         <div class="surface p-5 flex flex-col gap-4">
@@ -98,6 +106,23 @@
           <div>
             <p class="text-muted text-xs uppercase tracking-widest">Prix</p>
             <p class="ethnocentric text-foreground text-2xl mt-1">{{ priceLabel }}</p>
+          </div>
+
+          <div
+            v-if="distributionSummary || royaltyPercent"
+            class="flex flex-col gap-1.5 pt-3 border-t border-line text-xs"
+          >
+            <div v-if="distributionSummary" class="flex items-center justify-between gap-2">
+              <span class="text-muted inline-flex items-center gap-1.5">
+                <Icon name="ph:stack" class="text-sm" />
+                {{ distributionLabelText }}
+              </span>
+              <span class="text-foreground">{{ distributionSummary }}</span>
+            </div>
+            <p v-if="royaltyPercent" class="text-muted inline-flex items-center gap-1.5">
+              <Icon name="ph:percent" class="text-sm" />
+              {{ royaltyPercent }}% de royalties reversés à chaque revente
+            </p>
           </div>
 
           <!-- Entitled: the file is the deliverable, it wins over everything else -->
@@ -321,6 +346,20 @@
         </div>
       </aside>
     </section>
+
+    <Teleport to="body">
+      <div v-if="lightboxOpen" class="lightbox-overlay" @click.self="lightboxOpen = false">
+        <img :src="thumbnailUrl" :alt="asset?.title" class="lightbox-img">
+        <button
+          type="button"
+          class="ghost-btn !absolute top-4 right-4 !min-h-9 px-2.5"
+          aria-label="Fermer"
+          @click="lightboxOpen = false"
+        >
+          <Icon name="ph:x" class="text-lg" />
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -403,6 +442,17 @@ const priceLabel = computed(() => {
   if (a.price == null) return 'Prix non défini'
   return `${a.price} ${a.currency ?? ''}`.trim()
 })
+
+const distributionLabelText = computed(() => (asset.value ? distributionLabel(asset.value.distributionMode) : ''))
+const distributionSummary = computed(() => (asset.value ? distributionText(asset.value) : null))
+const royaltyPercent = computed(() => {
+  const bps = asset.value?.royaltyBps
+  if (!bps) return null
+  const pct = bps / 100
+  return Number.isInteger(pct) ? String(pct) : pct.toFixed(2)
+})
+
+const lightboxOpen = ref(false)
 
 const stars = computed(() => {
   const r = asset.value?.averageRating
@@ -567,3 +617,20 @@ useHead(() => ({
   ],
 }))
 </script>
+
+<style scoped>
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+}
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+}
+</style>

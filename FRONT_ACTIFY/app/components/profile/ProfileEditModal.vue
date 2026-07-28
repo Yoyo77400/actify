@@ -113,7 +113,7 @@ const avatarPreview = computed(() =>
   avatarObjectUrl.value ?? avatarImage(user.value?.avatarCid, user.value?.id ?? 'me'),
 )
 const bannerPreview = computed(() =>
-  bannerObjectUrl.value ?? bannerImage(user.value?.bannerCid, user.value?.id ?? 'me'),
+  bannerObjectUrl.value ?? profileBannerImage(user.value?.bannerCid),
 )
 
 function revoke(url: Ref<string | null>) {

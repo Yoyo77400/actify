@@ -17,6 +17,13 @@
         <Icon name="ph:seal-check" class="text-sm" />
         NFT
       </span>
+      <span
+        v-if="distText"
+        class="pill-badge absolute top-2.5 left-2.5 text-foreground bg-black/60"
+      >
+        <Icon name="ph:stack" class="text-sm" />
+        {{ distText }}
+      </span>
     </div>
 
     <div class="p-3.5 flex flex-col gap-2 flex-1">
@@ -51,6 +58,7 @@ import type { AssetCard } from '~/types/asset'
 const props = defineProps<{ asset: AssetCard }>()
 
 const thumbnailUrl = computed(() => assetImage(props.asset.thumbnailCid, props.asset.id))
+const distText = computed(() => distributionText(props.asset))
 
 const sellerName = computed(() => {
   const { displayName, username, id } = props.asset.seller

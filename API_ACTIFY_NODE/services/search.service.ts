@@ -25,6 +25,8 @@ interface AssetCardRow {
   isFree: boolean
   price: unknown
   currency: string | null
+  distributionMode: string
+  maxDownloads: number | null
   viewsCount: number
   salesCount: number
   createdAt: Date
@@ -41,6 +43,8 @@ function serializeAssetCard(listing: AssetCardRow) {
     isFree: listing.isFree,
     price: listing.price,
     currency: listing.currency,
+    distributionMode: listing.distributionMode,
+    maxDownloads: listing.maxDownloads,
     viewsCount: listing.viewsCount,
     salesCount: listing.salesCount,
     createdAt: listing.createdAt,
