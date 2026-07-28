@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { AppError } from '../utils/http'
+import { publicUrl } from '../utils/public-url'
 import { verifyXrplMint } from './chains/xrpl-mint'
 
 // XLS-20 NFTokenMint flag: the token can be transferred to others (required
@@ -26,9 +27,14 @@ function stringToHex(input: string): string {
 function mintParamsFor(listing: { id: string; royaltyPercentage: unknown }) {
   const royaltyPercent = listing.royaltyPercentage != null ? Number(listing.royaltyPercentage) : 0
   const transferFee = Math.min(MAX_TRANSFER_FEE, Math.round(royaltyPercent * TRANSFER_FEE_PER_PERCENT))
-  // Files are stored by Actify (not IPFS), so the NFT URI is a stable Actify
-  // reference to the asset. Deterministic and short (URI blob ≤ 256 bytes).
-  const uri = `actify:asset:${listing.id}`
+  // Per XLS-24 the URI resolves to a JSON metadata document, which is what
+  // makes a wallet show a name and an image rather than the raw URI. Files are
+  // stored by Actify (not IPFS), so that document is served by this API at a
+  // stable https URL keyed on the listing id — the slug is excluded on purpose,
+  // it changes with the title and the URI is immutable once minted.
+  // Deterministic and short (URI blob ≤ 256 bytes), as confirmMint re-derives
+  // it to match the transaction on-chain.
+  const uri = publicUrl(`/api/v1/assets/${listing.id}/metadata`)
   return { uri, uriHex: stringToHex(uri), taxon: NFT_TAXON, transferFee }
 }
 
@@ -53,9 +59,9 @@ async function getMinterAddresses(userId: string): Promise<string[]> {
 
 /**
  * Returns the NFTokenMint parameters the creator's wallet must sign to
- * tokenize the asset. The URI points at the asset's IPFS content (hex-encoded
- * per XLS-20), the TransferFee carries the royalty, and the taxon groups the
- * creator's assets. The wallet fills Account and submits.
+ * tokenize the asset. The URI points at the asset's XLS-24 metadata document
+ * (hex-encoded per XLS-20), the TransferFee carries the royalty, and the taxon
+ * is a fixed 0. The wallet fills Account and submits.
  */
 export async function buildMintIntent(userId: string, listingId: string) {
   const listing = await getOwnedListingOrThrow(userId, listingId)

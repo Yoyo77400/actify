@@ -172,6 +172,30 @@ Le wallet est l'unique moyen de connexion : `challenge` + `verify` font office d
 
 `categoryIds` référence des catégories existantes (`GET /categories`), plusieurs catégories par asset possibles. `royaltyBps` est en points de base (1000 = 10%). `currency` est un champ libre (pas d'enum) : "XRP" pour l'instant, prêt pour du multi-devise plus tard. `slug` est généré automatiquement à partir de `title` (et régénéré si le titre change) — c'est lui ou `id` qui identifie l'asset dans `GET/PUT/DELETE /assets/:idOrSlug|:id`.
 
+### Tokenisation (XLS-20 / XLS-24)
+
+| Méthode | Route | Description | Auth |
+|---------|-------|-------------|------|
+| `POST` | `/assets/:id/tokenize/intent` | Paramètres du `NFTokenMint` que le wallet du créateur doit signer | Bearer token + Owner |
+| `POST` | `/assets/:id/tokenize/confirm` | Enregistre le mint après re-vérification on-chain du `txHash` | Bearer token + Owner |
+| `GET` | `/assets/:id/metadata` | Document de métadonnées XLS-24 vers lequel pointe l'URI du NFT | None |
+
+`GET /assets/:id/metadata` est la seule route de l'API renvoyant du JSON **brut, hors enveloppe `{success, data}`** (avec `GET /files/:key` qui, lui, renvoie des octets). C'est volontaire : ce document *est* ce que l'URI on-chain résout, et un wallet le parse tel quel.
+
+```json
+{
+  "name": "Pack UI Kit Figma",
+  "description": "Kit UI complet avec 200+ composants",
+  "image": "https://actify.example/api/v1/files/<thumbnailCid>"
+}
+```
+
+`description` et `image` sont omis (et non vides) quand la donnée manque. La recherche se fait par `id` uniquement, jamais par `slug` : le slug est régénéré quand le titre change, alors que l'URI gravée sur le ledger est immuable. La route répond quel que soit le statut du listing — un asset est tokenisé alors qu'il est encore `Draft`, la publication exigeant un mint préalable.
+
+Elle sert `Access-Control-Allow-Origin: *` et `Cross-Origin-Resource-Policy: cross-origin` (idem sur `GET /files/:key` pour les images vérifiées) : sans ça, le CORP `same-origin` posé par défaut par `helmet` empêcherait justement les wallets et explorateurs de ledger de la lire.
+
+> ⚠️ Ces URLs absolues sont construites à partir de `PUBLIC_BASE_URL`, qui n'a **aucune valeur par défaut dans le code**. L'URI est écrite sur le XRP Ledger au mint et n'est plus modifiable ensuite : une origine devinée produirait un token définitivement irrésolvable. Tant que la variable est absente ou malformée, la tokenisation échoue en `500 PUBLIC_URL_NOT_CONFIGURED` au lieu de minter.
+
 ### Upload de fichiers
 
 | Méthode | Route | Description | Auth |

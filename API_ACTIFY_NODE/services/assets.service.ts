@@ -3,6 +3,7 @@ import { resolveEntitlement } from './entitlements.service'
 import { AppError, buildMeta } from '../utils/http'
 import type { Pagination } from '../utils/pagination'
 import { slugify } from '../utils/slug'
+import { publicUrl } from '../utils/public-url'
 import { assertAssignableCollection } from './collections.service'
 
 const DRAFT = 'Draft'
@@ -406,6 +407,42 @@ export async function getAssetByIdOrSlug(idOrSlug: string, viewerUserId: string 
     reviewsCount: rating._count._all,
     viewerEntitlement: { canDownload: reason != null, reason },
     isFavorited,
+  }
+}
+
+/**
+ * The XLS-24 metadata document the asset's minted NFT URI resolves to (see
+ * tokenize.service). Wallets and ledger explorers fetch it to show a name and
+ * an image instead of the raw URI string.
+ *
+ * Looked up by id only, never by slug: the slug is regenerated when the title
+ * changes, which would strand the URI already written on-chain.
+ *
+ * Served whatever the listing's status, unlike the catalogue view: an asset is
+ * tokenized while still a Draft (publishing requires a mint first), and a mint
+ * whose confirm never came back would otherwise leave an immutable on-chain URI
+ * pointing at a permanent 404. The exposure is bounded — reaching this needs
+ * the listing's UUID, which only becomes public through the mint itself.
+ */
+export async function getAssetMetadata(listingId: string) {
+  const listing = await prisma.listing.findFirst({
+    where: { id: listingId, deletedAt: null },
+    select: { title: true, shortDescription: true, description: true, thumbnailCid: true },
+  })
+  if (!listing) {
+    throw new AppError(404, 'NOT_FOUND', 'Asset introuvable')
+  }
+
+  // Undefined fields drop out of the JSON: XLS-24 makes description and image
+  // optional, and an empty string reads as a broken image to a wallet.
+  return {
+    name: listing.title,
+    // Blank wins over nothing with `??`, and neither endpoint normalizes an
+    // empty shortDescription away — so pick the first field that actually has
+    // something to show.
+    description: [listing.shortDescription, listing.description].find((d) => d != null && d.trim() !== ''),
+    // Absolute — a relative path is meaningless to a third-party wallet.
+    image: listing.thumbnailCid != null ? publicUrl(`/api/v1/files/${listing.thumbnailCid}`) : undefined,
   }
 }
 

@@ -54,6 +54,26 @@ export async function getByIdOrSlug(req: Request, res: Response) {
   sendSuccess(res, asset)
 }
 
+/**
+ * XLS-24 token metadata, served RAW — no {success, data} envelope. This
+ * document is what the NFT's on-chain URI resolves to: a wallet parses the
+ * body as-is, so wrapping it would hide name/description/image one level down
+ * and defeat the whole point.
+ */
+export async function metadata(req: Request, res: Response) {
+  const doc = await assetsService.getAssetMetadata(String(req.params.id))
+
+  // Read cross-origin by wallets and ledger explorers, which have no Actify
+  // session and no shared origin. helmet's default same-origin CORP would
+  // otherwise make this document unfetchable for exactly its intended callers.
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+  // Public, rarely-changing document polled by third parties we don't control.
+  res.setHeader('Cache-Control', 'public, max-age=300')
+
+  res.json(doc)
+}
+
 export async function update(req: Request, res: Response) {
   const body = req.body ?? {}
   const asset = await assetsService.updateAsset(req.user!.id, String(req.params.id), {

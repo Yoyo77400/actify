@@ -61,6 +61,12 @@ export function serveFile(req: Request, res: Response) {
   const mime = sniffImageMime(path)
   if (mime) {
     res.type(mime)
+    // A verified image may be the `image` of an asset's XLS-24 metadata, so
+    // wallets and explorers render it from their own origin. helmet's default
+    // same-origin CORP blocks that. Scoped to sniffed images only: opaque
+    // blobs keep the restrictive default, having no reason to be embedded.
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    res.setHeader('Access-Control-Allow-Origin', '*')
   } else {
     res.setHeader('Content-Type', 'application/octet-stream')
     res.setHeader('Content-Disposition', 'attachment')
