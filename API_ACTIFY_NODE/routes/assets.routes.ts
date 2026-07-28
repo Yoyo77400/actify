@@ -12,6 +12,10 @@ export const assetsRouter = Router()
 assetsRouter.post('/', requireAuth, assetsController.create)
 assetsRouter.get('/', assetsController.list)
 assetsRouter.get('/:idOrSlug', optionalAuth, assetsController.getByIdOrSlug)
+// XLS-24 metadata document the minted NFT URI points at. Public and
+// unauthenticated by contract: the callers are third-party wallets and ledger
+// explorers, which have no Actify session.
+assetsRouter.get('/:id/metadata', assetsController.metadata)
 assetsRouter.put('/:id', requireAuth, assetsController.update)
 // Direct file upload (owner): the main downloadable file and the thumbnail.
 assetsRouter.post('/:id/file', requireAuth, uploadSingle('file'), uploadsController.uploadFile)

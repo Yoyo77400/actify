@@ -60,6 +60,10 @@ async function main() {
   process.env.DATABASE_POOL_MAX = '1'
   process.env.JWT_SECRET ??= 'e2e-secret'
   process.env.PORT = String(API_PORT)
+  // utils/public-url.ts has no fallback by design (an NFT URI is immutable
+  // once minted). Point it at this harness so tokenization and the metadata
+  // document stay exercisable from a spec.
+  process.env.PUBLIC_BASE_URL ??= `http://127.0.0.1:${API_PORT}`
   // ADMIN_WALLET_ADDRESS may be injected by the caller to auto-promote the
   // e2e admin wallet on first login (see wallets.service.ts).
 
