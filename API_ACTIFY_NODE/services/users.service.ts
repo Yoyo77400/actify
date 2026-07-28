@@ -239,6 +239,8 @@ export async function listUserAssets(username: string, pagination: Pagination) {
         isFree: true,
         price: true,
         currency: true,
+        distributionMode: true,
+        maxDownloads: true,
         viewsCount: true,
         salesCount: true,
         createdAt: true,

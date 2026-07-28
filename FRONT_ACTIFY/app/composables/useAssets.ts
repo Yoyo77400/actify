@@ -11,6 +11,9 @@ export interface AssetListParams {
   sort?: 'createdAt' | 'price' | 'rating' | 'sales' | 'views'
   order?: 'asc' | 'desc'
   isFree?: boolean
+  minPrice?: number
+  maxPrice?: number
+  mode?: 'unlimited' | 'limited' | 'unique'
   page?: number
   limit?: number
 }
@@ -35,7 +38,7 @@ export function useAssets() {
     categories: () => api.get<CategoryWithCount[]>('/categories'),
     create: (body: CreateAssetBody) => api.post<AssetCard>('/assets', body),
     publish: (id: string) => api.post<AssetCard>(`/assets/${id}/publish`),
-    myListings: () => api.get<AssetCard[]>('/creator/listings'),
+    myListings: (params: AssetListParams = {}) => api.get<AssetCard[]>(`/creator/listings${toQuery(params)}`),
     uploadFile: (id: string, file: File) => {
       const fd = new FormData()
       fd.append('file', file)

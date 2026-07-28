@@ -339,23 +339,14 @@ export async function getAssetByIdOrSlug(idOrSlug: string, viewerUserId: string 
 
 // A creator's own listings across ALL statuses (Draft/Published/Archived) so
 // they can manage drafts and tokenize/publish — GET /assets is Published-only.
-export async function listMyListings(userId: string, pagination: Pagination) {
-  const where = { sellerId: userId, deletedAt: null }
-  const [items, total] = await Promise.all([
-    prisma.listing.findMany({
-      where,
-      include: FULL_INCLUDE,
-      orderBy: { createdAt: 'desc' },
-      skip: pagination.skip,
-      take: pagination.limit,
-    }),
-    prisma.listing.count({ where }),
-  ])
-  return { items: items.map(serializeListing), meta: buildMeta(pagination.page, pagination.limit, total) }
+export async function listMyListings(userId: string, filters: AssetListFilters, pagination: Pagination) {
+  return queryListings({ sellerId: userId, deletedAt: null }, filters, pagination)
 }
 
-function buildWhere(filters: AssetListFilters) {
-  const where: Record<string, unknown> = { status: PUBLISHED, deletedAt: null }
+// Filter conditions shared by the public catalogue and "my listings" - only
+// the base (status+deletedAt vs sellerId+deletedAt) differs between the two.
+function buildFilterConditions(filters: AssetListFilters): Record<string, unknown> {
+  const where: Record<string, unknown> = {}
 
   if (filters.q) {
     where.OR = [
@@ -402,7 +393,11 @@ const SORTABLE_FIELDS: Record<string, string> = {
 }
 
 export async function listAssets(filters: AssetListFilters, pagination: Pagination) {
-  const where = buildWhere(filters)
+  return queryListings({ status: PUBLISHED, deletedAt: null }, filters, pagination)
+}
+
+async function queryListings(baseWhere: Record<string, unknown>, filters: AssetListFilters, pagination: Pagination) {
+  const where = { ...baseWhere, ...buildFilterConditions(filters) }
   const order = filters.order === 'asc' ? 'asc' : 'desc'
 
   if (filters.sort === 'rating') {
