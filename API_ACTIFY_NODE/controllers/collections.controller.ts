@@ -10,7 +10,10 @@ export async function list(req: Request, res: Response) {
 }
 
 export async function getBySlug(req: Request, res: Response) {
-  const collection = await collectionsService.getCollectionBySlug(String(req.params.slug))
+  const collection = await collectionsService.getCollectionBySlug(
+    String(req.params.slug),
+    req.user?.id ?? null,
+  )
   sendSuccess(res, collection)
 }
 
@@ -19,6 +22,7 @@ export async function listAssets(req: Request, res: Response) {
   const { items, meta } = await collectionsService.listCollectionAssets(
     String(req.params.slug),
     pagination,
+    req.user?.id ?? null,
   )
   sendSuccess(res, items, meta)
 }
