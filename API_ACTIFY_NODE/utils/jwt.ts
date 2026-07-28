@@ -6,15 +6,21 @@ if (!process.env.JWT_SECRET) {
 
 const JWT_SECRET = process.env.JWT_SECRET
 const ACCESS_TOKEN_TTL = '15m'
-// Kept short while refresh tokens are stateless (no server-side revocation):
-// a leaked token stays usable for the full TTL. Revisit with the session store.
 const REFRESH_TOKEN_TTL = '7d'
+/** Same 7 days, in ms — the session row's expiry must match the refresh token's. */
+export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
 // Jeton intermédiaire (1er facteur seul) : durée de vie très courte.
 const PENDING_TOTP_TTL = '5m'
 
 // mfa:true est posé une fois le 2e facteur validé — requireTotp s'appuie dessus.
-export function signAccessToken(userId: string, opts: { mfa?: boolean } = {}): string {
-  return jwt.sign({ sub: userId, ...(opts.mfa ? { mfa: true } : {}) }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL })
+// `sid` lie le jeton à une session serveur révocable (sessions.service) : sans
+// lui, le jeton n'ouvre plus rien.
+export function signAccessToken(userId: string, opts: { mfa?: boolean; sid?: string } = {}): string {
+  return jwt.sign(
+    { sub: userId, ...(opts.mfa ? { mfa: true } : {}), ...(opts.sid ? { sid: opts.sid } : {}) },
+    JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_TTL },
+  )
 }
 
 // N'ouvre aucune route (type '2fa' rejeté par le middleware) : sert uniquement
@@ -23,12 +29,14 @@ export function signPendingTotpToken(userId: string): string {
   return jwt.sign({ sub: userId, type: '2fa' }, JWT_SECRET, { expiresIn: PENDING_TOTP_TTL })
 }
 
-// Stateless for now (no session store yet) — /auth/refresh will consume this
-// once the sessions/Auth2 work lands. No server-side revocation until then.
-// Carries mfa too: token rotation must not downgrade a 2FA-validated session
+// Carries mfa: token rotation must not downgrade a 2FA-validated session
 // (requireTotp would re-lock the account 15 minutes after login otherwise).
-export function signRefreshToken(userId: string, opts: { mfa?: boolean } = {}): string {
-  return jwt.sign({ sub: userId, type: 'refresh', ...(opts.mfa ? { mfa: true } : {}) }, JWT_SECRET, { expiresIn: REFRESH_TOKEN_TTL })
+export function signRefreshToken(userId: string, opts: { mfa?: boolean; sid?: string } = {}): string {
+  return jwt.sign(
+    { sub: userId, type: 'refresh', ...(opts.mfa ? { mfa: true } : {}), ...(opts.sid ? { sid: opts.sid } : {}) },
+    JWT_SECRET,
+    { expiresIn: REFRESH_TOKEN_TTL },
+  )
 }
 
 export function verifyToken(token: string): jwt.JwtPayload | null {

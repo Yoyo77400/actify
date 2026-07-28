@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import * as usersService from '../services/users.service'
 import { sendSuccess } from '../utils/http'
+import { clearAuthCookies } from '../utils/auth-cookies'
 import { parsePagination } from '../utils/pagination'
 
 export async function getMe(req: Request, res: Response) {
@@ -16,6 +17,9 @@ export async function updateMe(req: Request, res: Response) {
 
 export async function deleteMe(req: Request, res: Response) {
   const result = await usersService.softDeleteMe(req.user!.id)
+  // Les sessions sont révoquées côté serveur ; on retire aussi les cookies du
+  // navigateur, sinon ils survivraient à l'effacement du compte.
+  clearAuthCookies(res)
   sendSuccess(res, result)
 }
 

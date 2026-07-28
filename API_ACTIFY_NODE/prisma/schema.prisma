@@ -40,6 +40,10 @@ model User {
   // synchronisé avec le téléphone.
   twoFactorSecret  String?  @map("two_factor_secret")
   twoFactorEnabled Boolean  @default(false) @map("two_factor_enabled")
+  // Verrouillage par compte des vérifications TOTP : le rate limit par IP est
+  // contournable en distribuant l'attaque, celui-ci ne l'est pas.
+  totpFailedAttempts Int      @default(0) @map("totp_failed_attempts")
+  totpLockedUntil    DateTime? @map("totp_locked_until")
 
   role             Role           @relation(fields: [roleId], references: [id])
   wallets          Wallet[]
@@ -55,8 +59,31 @@ model User {
   notifications    Notification[]
   consents         Consent[]
   collections      Collection[]
+  sessions         Session[]
 
   @@map("users")
+}
+
+// Sessions serveur : sans elles, un JWT volé reste utilisable jusqu'à son
+// expiration et /auth/logout ne peut rien révoquer. Chaque jeton porte le `sid`
+// de sa session ; resolveUser la relit à chaque requête, donc révoquer ici coupe
+// l'accès immédiatement (déconnexion, appareil perdu, suppression de compte).
+model Session {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime  @default(now()) @map("last_used_at")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  // Purement informatif, pour que l'utilisateur reconnaisse ses appareils.
+  userAgent  String?   @map("user_agent")
+  ip         String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Listing des sessions actives d'un utilisateur.
+  @@index([userId, revokedAt])
+  @@map("sessions")
 }
 
 model Wallet {

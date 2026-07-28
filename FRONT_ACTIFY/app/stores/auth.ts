@@ -1,45 +1,37 @@
 import type { MeProfile } from '~/types/auth'
 
-const ACCESS_TOKEN_MAX_AGE = 60 * 15
-const REFRESH_TOKEN_MAX_AGE = 60 * 60 * 24 * 7
-// Dev runs on plain http://localhost where Secure cookies are dropped.
-const SECURE_COOKIES = !import.meta.dev
-
+/**
+ * Session state — deliberately holds NO token.
+ *
+ * The access/refresh pair now lives in httpOnly cookies set by the API: the
+ * browser attaches them on its own and this code cannot read them, so an XSS
+ * can no longer exfiltrate a session. They used to sit in JS-readable cookies
+ * because the wallet flow wrote them client-side.
+ *
+ * "Am I logged in?" is therefore answered by the profile the API returns for
+ * the current cookies, never by inspecting a token.
+ */
 export const useAuthStore = defineStore('auth', () => {
-  // Cookies (not localStorage) so the session survives reloads AND is visible
-  // during SSR. Not httpOnly by construction — the wallet flow needs to write
-  // them client-side; acceptable until the Auth2/session work moves issuance
-  // server-side.
-  const accessToken = useCookie<string | null>('actify_token', {
-    maxAge: ACCESS_TOKEN_MAX_AGE,
-    sameSite: 'lax',
-    secure: SECURE_COOKIES,
-  })
-  const refreshToken = useCookie<string | null>('actify_refresh', {
-    maxAge: REFRESH_TOKEN_MAX_AGE,
-    sameSite: 'lax',
-    secure: SECURE_COOKIES,
-  })
-
   const user = ref<MeProfile | null>(null)
   const isLoggedIn = computed(() => !!user.value)
 
-  function setTokens(tokens: { accessToken: string; refreshToken?: string }) {
-    accessToken.value = tokens.accessToken
-    if (tokens.refreshToken) {
-      refreshToken.value = tokens.refreshToken
-    }
+  // Set the moment a login succeeds, before the profile arrives: the session
+  // plugin uses it to know a /users/me attempt is worth making.
+  const authenticated = ref(false)
+
+  function markAuthenticated() {
+    authenticated.value = true
   }
 
   function setUser(profile: MeProfile) {
     user.value = profile
+    authenticated.value = true
   }
 
   function clearSession() {
-    accessToken.value = null
-    refreshToken.value = null
     user.value = null
+    authenticated.value = false
   }
 
-  return { accessToken, refreshToken, user, isLoggedIn, setTokens, setUser, clearSession }
+  return { user, isLoggedIn, authenticated, markAuthenticated, setUser, clearSession }
 })

@@ -3,20 +3,23 @@ import { generateTotp } from './totp'
 
 test.use({ walletPool: 'totp' })
 
-// The 6-digit code space is only 1e6 wide and there is no account lockout, so
-// /auth/verify-2fa is only brute-force-proof as long as its rate limiter stays
-// wired up. Unit tests cover the limiter in isolation; this asserts the whole
-// chain a real attacker faces — enrolled 2FA, the login step-up gate, and the
-// throttle actually cutting the guesses off.
+// Le TOTP est la dernière ligne quand un wallet est compromis : on n'atteint
+// cette étape qu'après une signature valide. Avec 1e6 combinaisons seulement,
+// elle ne tient que si les essais sont bornés. Deux protections la couvrent :
+// un throttle par IP (couvert par tests/rate-limit.routes.test.ts côté API) et
+// un verrou par COMPTE, seul à résister à une attaque répartie sur plusieurs IP.
+// C'est ce verrou qu'on vérifie ici, de bout en bout et tel que l'utilisateur
+// le voit — il ne dépend d'aucune topologie réseau, contrairement au throttle
+// par IP dont le compartiment change selon que l'app tape l'API en direct ou
+// via le proxy.
 test.describe('totpLoginStepUp', () => {
-  // Requests share the browser's source IP, so the limiter counts these too.
-  const VERIFY_2FA = 'http://localhost:3000/api/v1/auth/verify-2fa'
-  const MAX_GUESSES = 200
+  // Doit rester aligné sur MAX_TOTP_ATTEMPTS (two-factor.service.ts).
+  const MAX_ATTEMPTS = 5
 
-  test('enrollsThenBlocksBruteForceOnTheLoginCode', async ({ page, request }) => {
+  test('enrollsThenLocksTheAccountAfterRepeatedWrongCodes', async ({ page }) => {
     await registerNewAccount(page, 'e2e_totp')
 
-    // ── Enroll 2FA, acting as the user's authenticator app ──
+    // ── Enrôlement 2FA, le test jouant l'app d'authentification ──
     await gotoSecuritySettings(page)
     await page.getByRole('button', { name: /Activer la 2FA/i }).click()
 
@@ -27,34 +30,34 @@ test.describe('totpLoginStepUp', () => {
     await page.getByRole('button', { name: /Activer la 2FA/i }).click()
     await expect(page.getByText(/2FA est désormais activée/i)).toBeVisible()
 
-    // ── A wallet signature alone no longer logs in ──
+    // ── Une signature wallet ne suffit plus à ouvrir la session ──
     await clearSession(page)
     await walletLogin(page)
     await expect(page.getByText(/Vérification en deux étapes/i)).toBeVisible()
 
-    // A wrong code is rejected and opens no session.
-    await page.getByPlaceholder('000000').fill('000000')
-    await page.getByRole('button', { name: /Vérifier le code/i }).click()
-    await expect(page.getByRole('alert')).toBeVisible()
+    const code = page.getByPlaceholder('000000')
+    const submit = page.getByRole('button', { name: /Vérifier le code/i })
+
+    // Un code faux est refusé et n'ouvre aucune session.
+    await code.fill('000000')
+    await submit.click()
+    await expect(page.getByRole('alert')).toContainText(/invalide/i)
     await expect(page).toHaveURL(/\/auth\/login/)
 
-    // ── Guessing at scale gets cut off ──
-    // Loop until the throttle trips instead of assuming an exact count: the UI
-    // attempt above already consumed part of the window's budget.
-    let limited = false
-    for (let i = 0; i < MAX_GUESSES && !limited; i++) {
-      const res = await request.post(VERIFY_2FA, {
-        data: { pendingToken: 'not-a-real-token', code: '000000' },
-        failOnStatusCode: false,
-      })
-      limited = res.status() === 429
+    // ── Les essais répétés verrouillent le compte ──
+    for (let attempt = 2; attempt <= MAX_ATTEMPTS; attempt++) {
+      await code.fill(String(attempt).repeat(6))
+      await submit.click()
+      await expect(page.getByRole('alert')).toBeVisible()
     }
-    expect(limited, 'verify-2fa must start refusing guesses').toBe(true)
 
-    // The user-facing surface is throttled too, not just direct API calls.
-    await page.getByPlaceholder('000000').fill('111111')
-    await page.getByRole('button', { name: /Vérifier le code/i }).click()
-    await expect(page.getByRole('alert')).toContainText(/Trop de requêtes/i)
+    await expect(page.getByRole('alert')).toContainText(/Trop de codes incorrects/i)
+
+    // Le verrou porte sur le COMPTE : même le bon code est refusé, sinon un
+    // attaquant reprendrait ses essais là où il s'est arrêté.
+    await code.fill(generateTotp(secret))
+    await submit.click()
+    await expect(page.getByRole('alert')).toContainText(/Trop de codes incorrects/i)
     await expect(page).toHaveURL(/\/auth\/login/)
   })
 })
