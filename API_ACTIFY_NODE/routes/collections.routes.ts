@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { requireAuth } from '../middlewares/auth.middleware'
+import { optionalAuth, requireAuth } from '../middlewares/auth.middleware'
 import * as collectionsController from '../controllers/collections.controller'
 
 export const collectionsRouter = Router()
@@ -9,8 +9,9 @@ collectionsRouter.get('/me', requireAuth, collectionsController.listMine)
 
 collectionsRouter.get('/', collectionsController.list)
 collectionsRouter.post('/', requireAuth, collectionsController.create)
-collectionsRouter.get('/:slug', collectionsController.getBySlug)
-collectionsRouter.get('/:slug/assets', collectionsController.listAssets)
+// optionalAuth : le propriétaire voit ses brouillons, un visiteur non.
+collectionsRouter.get('/:slug', optionalAuth, collectionsController.getBySlug)
+collectionsRouter.get('/:slug/assets', optionalAuth, collectionsController.listAssets)
 // Ownership is enforced in the service (owner_id), not by a role: a collection
 // belongs to the creator who made it.
 collectionsRouter.put('/:id', requireAuth, collectionsController.update)

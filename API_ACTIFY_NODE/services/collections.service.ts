@@ -29,6 +29,9 @@ function serializeCollection(collection: CollectionRow) {
   }
 }
 
+// listingCount = ce qui est visible publiquement, y compris pour le
+// propriétaire : c'est l'information utile (« combien de mes assets sont en
+// ligne »). Ses brouillons restent visibles dans la LISTE, badgés.
 const COLLECTION_COUNT = {
   _count: { select: { listings: { where: PUBLISHED_LISTING_FILTER } } },
 } as const
@@ -49,6 +52,8 @@ const LISTING_CARD_SELECT = {
   viewsCount: true,
   salesCount: true,
   createdAt: true,
+  // Permet au propriétaire de distinguer ses brouillons dans sa collection.
+  status: true,
 } as const
 
 export async function listCollections(pagination: Pagination) {
@@ -68,25 +73,36 @@ export async function listCollections(pagination: Pagination) {
   }
 }
 
-export async function getCollectionBySlug(slug: string) {
-  const collection = await prisma.collection.findUnique({
+export async function getCollectionBySlug(slug: string, viewerUserId?: string | null) {
+  const existing = await prisma.collection.findUnique({ where: { slug }, select: { ownerId: true } })
+  if (!existing) {
+    throw new AppError(404, 'NOT_FOUND', 'Collection introuvable')
+  }
+
+  const isOwner = viewerUserId != null && existing.ownerId === viewerUserId
+  const collection = await prisma.collection.findUniqueOrThrow({
     where: { slug },
     include: COLLECTION_COUNT,
   })
-  if (!collection) {
-    throw new AppError(404, 'NOT_FOUND', 'Collection introuvable')
-  }
-  return serializeCollection(collection)
+  return { ...serializeCollection(collection), isOwner }
 }
 
 /** Published listings of a collection, paginated — the collection page's body. */
-export async function listCollectionAssets(slug: string, pagination: Pagination) {
+export async function listCollectionAssets(
+  slug: string,
+  pagination: Pagination,
+  viewerUserId?: string | null,
+) {
   const collection = await prisma.collection.findUnique({ where: { slug } })
   if (!collection) {
     throw new AppError(404, 'NOT_FOUND', 'Collection introuvable')
   }
 
-  const where = { collectionId: collection.id, ...PUBLISHED_LISTING_FILTER }
+  // Le propriétaire voit ses brouillons ; le public ne voit que le publié.
+  const isOwner = viewerUserId != null && collection.ownerId === viewerUserId
+  const where = isOwner
+    ? { collectionId: collection.id, deletedAt: null }
+    : { collectionId: collection.id, ...PUBLISHED_LISTING_FILTER }
   const [items, total] = await Promise.all([
     prisma.listing.findMany({
       where,
@@ -186,7 +202,7 @@ export async function listMyCollections(userId: string) {
     include: COLLECTION_COUNT,
     orderBy: { name: 'asc' },
   })
-  return rows.map(serializeCollection)
+  return rows.map(collection => ({ ...serializeCollection(collection), isOwner: true }))
 }
 
 /**

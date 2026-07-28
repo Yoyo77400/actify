@@ -20,7 +20,7 @@
       <input id="edit-asset-tags" v-model.trim="form.tags" type="text" placeholder="cyberpunk, texture, 4k" class="input">
     </div>
 
-    <div class="flex flex-col gap-1.5">
+    <div v-if="props.showCollection" class="flex flex-col gap-1.5">
       <label for="edit-asset-collection" class="text-foreground text-sm font-medium">Collection</label>
       <select id="edit-asset-collection" v-model="form.collectionId" class="select">
         <option :value="null">Aucune collection</option>
@@ -97,16 +97,25 @@ const DISTRIBUTION_MODES: Array<{ value: DistributionMode; label: string }> = [
   { value: 'unique', label: 'Pièce unique' },
 ]
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   initial: AssetCard
   saving: boolean
   error: string | null
-}>()
+  /**
+   * Masqué en modération : une collection appartient au VENDEUR, et l'API
+   * refuse (à raison) qu'un tiers y range un asset. Afficher le champ laissait
+   * croire à un enregistrement qui n'avait jamais lieu.
+   */
+  showCollection?: boolean
+}>(), { showCollection: true })
 const emit = defineEmits<{ submit: [UpdateAssetBody]; cancel: [] }>()
 
 // The picker only ever offers the caller's own collections; the API rejects
 // anything else anyway (assertAssignableCollection).
-const { data: collectionsData } = await useAsyncData('my-collections-picker', () => useCollections().mine())
+const { data: collectionsData } = await useAsyncData(
+  'my-collections-picker',
+  () => (props.showCollection ? useCollections().mine() : Promise.resolve([])),
+)
 const collections = computed(() => collectionsData.value ?? [])
 
 const form = reactive({
@@ -146,7 +155,8 @@ function submit() {
     isFree: form.isFree,
     basePrice: form.isFree ? null : form.basePrice,
     royaltyBps: Math.round(Math.min(100, Math.max(0, form.royaltyPercent)) * 100),
-    collectionId: form.collectionId,
+    // Omis en modération : l'API admin ne traite pas ce champ.
+    ...(props.showCollection ? { collectionId: form.collectionId } : {}),
   })
 }
 </script>
