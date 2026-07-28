@@ -189,8 +189,11 @@ describe('verrouillage TOTP par compte', () => {
 
     userUpdate.mockClear()
     userFindUnique.mockResolvedValue(lockedUser({ totpFailedAttempts: 4 }) as never)
+    // L'essai qui déclenche le verrou l'annonce déjà : sans ça, l'utilisateur
+    // ne comprendrait qu'à l'essai suivant pourquoi il est bloqué.
     await expect(verifyLoginTotp(signPendingTotpToken('user-1'), '000000')).rejects.toMatchObject({
-      code: 'TWO_FACTOR_INVALID_CODE',
+      status: 429,
+      code: 'TOTP_LOCKED',
     })
     // 5e échec : verrouillage, et le compteur repart de zéro.
     const data = userUpdate.mock.calls[0]![0]!.data as { totpFailedAttempts: number; totpLockedUntil: Date }

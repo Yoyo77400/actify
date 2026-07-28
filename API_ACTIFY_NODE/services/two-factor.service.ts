@@ -30,18 +30,28 @@ function assertNotLocked(user: { totpLockedUntil: Date | null }) {
   }
 }
 
-/** Échec : incrémente, et verrouille au seuil. Le compteur repart de zéro au verrouillage. */
+/**
+ * Échec : incrémente, et verrouille au seuil. Le compteur repart de zéro au
+ * verrouillage. Quand le verrou tombe, l'erreur renvoyée est TOTP_LOCKED et non
+ * « code invalide » : sinon l'utilisateur ne comprendrait qu'à l'essai suivant
+ * pourquoi il est bloqué.
+ */
 async function registerFailedTotp(user: { id: string; totpFailedAttempts: number }) {
   const attempts = user.totpFailedAttempts + 1
   const locked = attempts >= MAX_TOTP_ATTEMPTS
+  const lockedUntil = locked ? new Date(Date.now() + TOTP_LOCK_MS) : undefined
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
       totpFailedAttempts: locked ? 0 : attempts,
-      totpLockedUntil: locked ? new Date(Date.now() + TOTP_LOCK_MS) : undefined,
+      totpLockedUntil: lockedUntil,
     },
   })
+
+  if (lockedUntil) {
+    assertNotLocked({ totpLockedUntil: lockedUntil })
+  }
 }
 
 /** Succès : on repart d'une ardoise vierge, sinon des échecs anciens finiraient par verrouiller. */
