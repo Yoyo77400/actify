@@ -3,19 +3,33 @@ import type { NextFunction, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 
 vi.mock('../services/prisma', () => ({
-  prisma: { user: { findUnique: vi.fn() } },
+  prisma: { session: { findUnique: vi.fn() } },
 }))
 
 import { prisma } from '../services/prisma'
 import { optionalAuth, requireAuth } from '../middlewares/auth.middleware'
 import { signAccessToken, signPendingTotpToken, signRefreshToken } from '../utils/jwt'
 
-const userFindUnique = vi.mocked(prisma.user.findUnique)
+const sessionFindUnique = vi.mocked(prisma.session.findUnique)
 
 const USER_ID = 'user-1'
+const SESSION_ID = 'session-1'
 
 function activeUser(overrides: Record<string, unknown> = {}) {
   return { id: USER_ID, deletedAt: null, isBanned: false, twoFactorEnabled: false, ...overrides }
+}
+
+// Un jeton n'ouvre plus rien seul : il désigne une session serveur, relue à
+// chaque requête. C'est elle qui porte l'utilisateur.
+function activeSession(userOverrides: Record<string, unknown> = {}, overrides: Record<string, unknown> = {}) {
+  return {
+    id: SESSION_ID,
+    userId: USER_ID,
+    revokedAt: null,
+    expiresAt: new Date(Date.now() + 60_000),
+    user: activeUser(userOverrides),
+    ...overrides,
+  }
 }
 
 // Exécute le middleware et renvoie la requête (pour inspecter req.user) et
@@ -32,7 +46,7 @@ async function run(
 
 beforeEach(() => {
   vi.clearAllMocks()
-  userFindUnique.mockResolvedValue(activeUser() as never)
+  sessionFindUnique.mockResolvedValue(activeSession() as never)
 })
 
 describe('requireAuth : jeton absent ou malformé', () => {
@@ -40,11 +54,11 @@ describe('requireAuth : jeton absent ou malformé', () => {
     const { next } = await run(requireAuth, undefined)
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 401, code: 'AUTH_REQUIRED' }))
-    expect(userFindUnique).not.toHaveBeenCalled()
+    expect(sessionFindUnique).not.toHaveBeenCalled()
   })
 
   it('rejette un en-tête sans le préfixe « Bearer »', async () => {
-    const { next } = await run(requireAuth, signAccessToken(USER_ID))
+    const { next } = await run(requireAuth, signAccessToken(USER_ID, { sid: SESSION_ID }))
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 401 }))
   })
@@ -67,14 +81,14 @@ describe('requireAuth : jeton absent ou malformé', () => {
 
 describe('requireAuth : seul le jeton d\'accès ouvre une session', () => {
   it('accepte un jeton d\'accès et attache l\'utilisateur à la requête', async () => {
-    const { req, next } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID)}`)
+    const { req, next } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID, { sid: SESSION_ID })}`)
 
     expect(next).toHaveBeenCalledWith()
-    expect(req.user).toEqual({ id: USER_ID, mfa: false, twoFactorEnabled: false })
+    expect(req.user).toEqual({ id: USER_ID, mfa: false, twoFactorEnabled: false, sessionId: SESSION_ID })
   })
 
   it('REFUSE un jeton de rafraîchissement présenté comme session', async () => {
-    const { req, next } = await run(requireAuth, `Bearer ${signRefreshToken(USER_ID)}`)
+    const { req, next } = await run(requireAuth, `Bearer ${signRefreshToken(USER_ID, { sid: SESSION_ID })}`)
 
     // Le refresh ne sert qu'à obtenir un nouvel access token : l'accepter ici
     // donnerait une session de 7 jours au lieu de 15 minutes.
@@ -92,46 +106,46 @@ describe('requireAuth : seul le jeton d\'accès ouvre une session', () => {
   })
 
   it('propage le drapeau mfa d\'une session ayant validé le 2e facteur', async () => {
-    userFindUnique.mockResolvedValue(activeUser({ twoFactorEnabled: true }) as never)
+    sessionFindUnique.mockResolvedValue(activeSession({ twoFactorEnabled: true }) as never)
 
-    const { req } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID, { mfa: true })}`)
+    const { req } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID, { mfa: true, sid: SESSION_ID })}`)
 
     // C'est ce drapeau que requireTotp lit pour les actions sensibles.
-    expect(req.user).toEqual({ id: USER_ID, mfa: true, twoFactorEnabled: true })
+    expect(req.user).toEqual({ id: USER_ID, mfa: true, twoFactorEnabled: true, sessionId: SESSION_ID })
   })
 })
 
 describe('requireAuth : état du compte revérifié à chaque requête', () => {
   it('rejette un jeton valide dont le compte n\'existe plus', async () => {
-    userFindUnique.mockResolvedValue(null)
+    sessionFindUnique.mockResolvedValue(null)
 
-    const { next } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID)}`)
+    const { next } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID, { sid: SESSION_ID })}`)
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 401 }))
   })
 
   it('rejette un jeton valide dont le compte a été supprimé (RGPD)', async () => {
-    userFindUnique.mockResolvedValue(activeUser({ deletedAt: new Date() }) as never)
+    sessionFindUnique.mockResolvedValue(activeSession({ deletedAt: new Date() }) as never)
 
     // Le jeton reste cryptographiquement valide jusqu'à 15 min après la
     // suppression : c'est la relecture en base qui coupe l'accès immédiatement.
-    const { next } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID)}`)
+    const { next } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID, { sid: SESSION_ID })}`)
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 401 }))
   })
 
   it('rejette un compte banni avec un 403 distinct', async () => {
-    userFindUnique.mockResolvedValue(activeUser({ isBanned: true }) as never)
+    sessionFindUnique.mockResolvedValue(activeSession({ isBanned: true }) as never)
 
-    const { next } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID)}`)
+    const { next } = await run(requireAuth, `Bearer ${signAccessToken(USER_ID, { sid: SESSION_ID })}`)
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'USER_BANNED' }))
   })
 
   it('relit le compte en base à chaque requête plutôt que de croire le jeton', async () => {
-    await run(requireAuth, `Bearer ${signAccessToken(USER_ID)}`)
+    await run(requireAuth, `Bearer ${signAccessToken(USER_ID, { sid: SESSION_ID })}`)
 
-    expect(userFindUnique).toHaveBeenCalledWith({ where: { id: USER_ID } })
+    expect(sessionFindUnique).toHaveBeenCalledWith({ where: { id: SESSION_ID }, include: { user: true } })
   })
 })
 
@@ -141,11 +155,11 @@ describe('optionalAuth', () => {
 
     expect(next).toHaveBeenCalledWith()
     expect(req.user).toBeUndefined()
-    expect(userFindUnique).not.toHaveBeenCalled()
+    expect(sessionFindUnique).not.toHaveBeenCalled()
   })
 
   it('attache l\'utilisateur quand un jeton valide est présenté', async () => {
-    const { req, next } = await run(optionalAuth, `Bearer ${signAccessToken(USER_ID)}`)
+    const { req, next } = await run(optionalAuth, `Bearer ${signAccessToken(USER_ID, { sid: SESSION_ID })}`)
 
     expect(next).toHaveBeenCalledWith()
     expect(req.user).toMatchObject({ id: USER_ID })
@@ -162,18 +176,18 @@ describe('optionalAuth', () => {
   })
 
   it('rejette également un compte banni qui présente un jeton valide', async () => {
-    userFindUnique.mockResolvedValue(activeUser({ isBanned: true }) as never)
+    sessionFindUnique.mockResolvedValue(activeSession({ isBanned: true }) as never)
 
-    const { next } = await run(optionalAuth, `Bearer ${signAccessToken(USER_ID)}`)
+    const { next } = await run(optionalAuth, `Bearer ${signAccessToken(USER_ID, { sid: SESSION_ID })}`)
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 403, code: 'USER_BANNED' }))
   })
 
   it('transmet à next() une panne de base plutôt que de laisser passer anonymement', async () => {
     const dbError = new Error('connection lost')
-    userFindUnique.mockRejectedValue(dbError)
+    sessionFindUnique.mockRejectedValue(dbError)
 
-    const { next } = await run(optionalAuth, `Bearer ${signAccessToken(USER_ID)}`)
+    const { next } = await run(optionalAuth, `Bearer ${signAccessToken(USER_ID, { sid: SESSION_ID })}`)
 
     expect(next).toHaveBeenCalledWith(dbError)
   })

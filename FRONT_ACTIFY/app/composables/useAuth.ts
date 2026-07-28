@@ -11,11 +11,19 @@ export function useAuth() {
     return me
   }
 
-  // Tokens are stateless (no server-side session yet), so logging out is
-  // purely local: drop the cookies and the in-memory profile.
-  function logout() {
-    store.clearSession()
-    navigateTo('/auth/login')
+  // Revokes the server session first: without that call, the tokens stayed
+  // valid for their whole TTL and "logging out" only hid them from this
+  // browser. Local state is cleared regardless — a network failure must not
+  // leave the user seemingly signed in.
+  async function logout() {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Already expired or revoked: nothing left to cut server-side.
+    } finally {
+      store.clearSession()
+      await navigateTo('/auth/login')
+    }
   }
 
   // RGPD : export complet (portabilité) et suppression de compte (droit à

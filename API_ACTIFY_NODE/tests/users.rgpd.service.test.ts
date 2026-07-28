@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // d'ailleurs les seules protégées par requireTotp.
 vi.mock('../services/prisma', () => ({
   prisma: {
+    // softDeleteMe révoque les sessions : un jeton émis juste avant ne doit
+    // pas survivre à l'effacement du compte.
+    session: { create: vi.fn(), updateMany: vi.fn() },
     user: { findUniqueOrThrow: vi.fn(), update: vi.fn() },
     wallet: { deleteMany: vi.fn() },
     listing: { findMany: vi.fn() },
@@ -50,6 +53,7 @@ function rawUser(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+    vi.mocked(prisma.session.updateMany).mockResolvedValue({ count: 0 } as never)
   vi.clearAllMocks()
 })
 

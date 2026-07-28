@@ -5,6 +5,7 @@ import { signAccessToken } from '../utils/jwt'
 
 vi.mock('../services/prisma', () => ({
   prisma: {
+    session: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
     user: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
     listing: { findMany: vi.fn() },
     purchase: { findMany: vi.fn() },
@@ -64,14 +65,31 @@ const twoFactorUser = {
 // HTTP-level coverage of the requireTotp gate: the export leaks the full
 // profile + activity history, same sensitivity as DELETE /users/me right
 // above it, which already requires the 2FA step-up.
+const SESSION_ID = 'session-1'
+
+// requireAuth relit la session (qui embarque l'utilisateur) : un jeton seul
+// n'ouvre plus rien, c'est ce qui rend la révocation immédiate.
+function sessionFor(user: Record<string, unknown>) {
+  return {
+    id: SESSION_ID,
+    userId: 'user-1',
+    revokedAt: null,
+    expiresAt: new Date(Date.now() + 60_000),
+    user,
+  }
+}
+
+const authToken = (opts: { mfa?: boolean } = {}) => signAccessToken('user-1', { ...opts, sid: SESSION_ID })
+
 describe('GET /api/v1/users/me/data-export', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(prisma.session.findUnique).mockResolvedValue(sessionFor(twoFactorUser) as never)
     userFindUnique.mockResolvedValue(twoFactorUser as never)
   })
 
   it('rejects a session token without the mfa step-up on a 2FA-enabled account', async () => {
-    const token = signAccessToken('user-1')
+    const token = authToken()
     const res = await getDataExport(token)
     expect(res.status).toBe(403)
     const json = (await res.json()) as Envelope
@@ -88,12 +106,15 @@ describe('GET /api/v1/users/me/data-export', () => {
     nftFindMany.mockResolvedValue([])
     resaleFindMany.mockResolvedValue([])
 
-    const token = signAccessToken('user-1', { mfa: true })
+    const token = authToken({ mfa: true })
     const res = await getDataExport(token)
     expect(res.status).toBe(200)
   })
 
   it('does not require the step-up on an account without 2FA enabled', async () => {
+    vi.mocked(prisma.session.findUnique).mockResolvedValue(
+      sessionFor({ ...twoFactorUser, twoFactorEnabled: false }) as never,
+    )
     userFindUnique.mockResolvedValue({ ...twoFactorUser, twoFactorEnabled: false } as never)
     userFindUniqueOrThrow.mockResolvedValue({ ...twoFactorUser, twoFactorEnabled: false } as never)
     listingFindMany.mockResolvedValue([])
@@ -104,7 +125,7 @@ describe('GET /api/v1/users/me/data-export', () => {
     nftFindMany.mockResolvedValue([])
     resaleFindMany.mockResolvedValue([])
 
-    const token = signAccessToken('user-1')
+    const token = authToken()
     const res = await getDataExport(token)
     expect(res.status).toBe(200)
   })

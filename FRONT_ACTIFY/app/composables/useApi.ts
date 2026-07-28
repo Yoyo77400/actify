@@ -44,13 +44,21 @@ export function useApi() {
   const nuxtApp = useNuxtApp() as { _refreshInFlight?: Promise<void> | null }
 
   async function rawRequest<T>(path: string, opts: RequestOptions): Promise<T> {
-    const sendAuth = opts.auth !== false && !!store.accessToken
     const res = await $fetch<ApiEnvelope<T>>(path, {
       baseURL: config.public.apiBase,
       method: opts.method ?? 'GET',
       // Callers pass typed DTOs; ofetch serializes any plain object to JSON.
       body: opts.body as Record<string, unknown> | undefined,
-      headers: sendAuth ? { Authorization: `Bearer ${store.accessToken}` } : {},
+      // The session travels in httpOnly cookies the browser attaches on its
+      // own — this code cannot read them, which is the point. `auth: false`
+      // still exists for calls that must stay anonymous (wallet login), so a
+      // leftover session never turns a login into a silent wallet-link.
+      // Toujours 'include' : 'omit' empêcherait aussi le navigateur d'ENREGISTRER
+      // les cookies renvoyés, donc la connexion ne poserait jamais de session.
+      credentials: 'include',
+      // SSR has no browser to attach cookies: forward the incoming ones so the
+      // server-side render sees the same session as the client.
+      headers: import.meta.server ? useRequestHeaders(['cookie']) : {},
       timeout: opts.timeoutMs ?? REQUEST_TIMEOUT_MS,
     })
     return res.data
@@ -62,11 +70,14 @@ export function useApi() {
     nuxtApp._refreshInFlight ??= $fetch<ApiEnvelope<{ accessToken: string; refreshToken: string }>>('/auth/refresh', {
       baseURL: config.public.apiBase,
       method: 'POST',
-      body: { refreshToken: store.refreshToken },
+      // The refresh token lives in an httpOnly cookie; the server reads it and
+      // rotates both cookies in its response.
+      credentials: 'include',
+      headers: import.meta.server ? useRequestHeaders(['cookie']) : {},
       timeout: REQUEST_TIMEOUT_MS,
     })
-      .then((res) => {
-        store.setTokens(res.data)
+      .then(() => {
+        store.markAuthenticated()
       })
       .catch((err) => {
         // Only a rejected token kills the session; a network blip must not log the user out.
@@ -93,7 +104,6 @@ export function useApi() {
         && err instanceof FetchError
         && err.statusCode === 401
         && toApiError(err)?.code === 'AUTH_REQUIRED'
-        && !!store.refreshToken
       if (!expired) throw err
 
       try {

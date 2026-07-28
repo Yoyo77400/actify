@@ -69,7 +69,6 @@ function toQuery(params: object): string {
 export function useAdminApi() {
   const api = useApi()
   const config = useRuntimeConfig()
-  const store = useAuthStore()
 
   // useApi().get unwraps the envelope and drops `meta`, which the admin tables
   // need for real pagination. This raw GET keeps the envelope; an expiry 401
@@ -78,7 +77,9 @@ export function useAdminApi() {
     const call = () =>
       $fetch<ListEnvelope<T>>(path, {
         baseURL: config.public.apiBase,
-        headers: store.accessToken ? { Authorization: `Bearer ${store.accessToken}` } : {},
+        // Session en cookies httpOnly : le navigateur les joint lui-même.
+        credentials: 'include',
+        headers: import.meta.server ? useRequestHeaders(['cookie']) : {},
         timeout: REQUEST_TIMEOUT_MS,
       })
 
@@ -90,7 +91,6 @@ export function useAdminApi() {
         err instanceof FetchError
         && err.statusCode === 401
         && toApiError(err)?.code === 'AUTH_REQUIRED'
-        && !!store.refreshToken
       if (!expired) throw err
       try {
         await api.refreshSession()
