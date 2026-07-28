@@ -34,7 +34,7 @@ export function useWalletAuth() {
   const totpPending = ref<string | null>(null)
   const verifying = ref(false)
 
-  async function signChallenge(id: WalletId, opts: { auth: boolean }): Promise<WalletVerifyResult> {
+  async function signChallenge(id: WalletId, opts: { intent: 'login' | 'link' }): Promise<WalletVerifyResult> {
     const adapter = await getWalletAdapter(id)
 
     step.value = `Ouverture de ${adapter.label}…`
@@ -61,12 +61,16 @@ export function useWalletAuth() {
       signature,
       nonce: challenge.nonce,
       chain: CHAIN,
-    }, { auth: opts.auth })
+      // Dit au serveur ce qu'on veut faire. Les cookies de session partent
+      // toujours (ils doivent : la réponse en pose de nouveaux), donc seule
+      // cette intention distingue une connexion d'une liaison de wallet.
+      intent: opts.intent,
+    })
   }
 
   async function run(
     id: WalletId,
-    opts: { auth: boolean; before?: () => Promise<void> },
+    opts: { intent: 'login' | 'link'; before?: () => Promise<void> },
     flow: (result: WalletVerifyResult) => Promise<void>,
   ) {
     pending.value = id
@@ -90,14 +94,14 @@ export function useWalletAuth() {
   }
 
   /**
-   * Login page flow: the signature IS the login, so verify goes out WITHOUT
-   * the Authorization header — a leftover session must not turn a login
-   * attempt into a silent wallet-link on the old account. Unknown wallet →
-   * the backend creates the account and we route to the signup form; known
-   * wallet → straight to the profile.
+   * Login page flow: the signature IS the login. `intent: 'login'` tells the
+   * server to ignore any session the browser still carries, so a leftover one
+   * can't turn this into a silent wallet-link on the old account. Unknown
+   * wallet → the backend creates the account and we route to the signup form;
+   * known wallet → straight to the profile.
    */
   async function loginWithWallet(id: WalletId) {
-    await run(id, { auth: false }, async (result) => {
+    await run(id, { intent: 'login' }, async (result) => {
       if (result.mode === 'totp_required') {
         totpPending.value = result.pendingToken
         return
@@ -106,7 +110,7 @@ export function useWalletAuth() {
         error.value = 'Réponse inattendue du serveur, réessaie.'
         return
       }
-      store.setTokens(result)
+      store.markAuthenticated()
       const me = await fetchMe()
       // isNewAccount covers the nominal signup; the username check re-prompts
       // users who bailed out of the form on a previous visit.
@@ -123,8 +127,8 @@ export function useWalletAuth() {
     verifying.value = true
     error.value = null
     try {
-      const result = await verifyLogin(totpPending.value, code)
-      store.setTokens(result)
+      await verifyLogin(totpPending.value, code)
+      store.markAuthenticated()
       totpPending.value = null
       await fetchMe()
       await navigateTo('/profile')
@@ -138,7 +142,7 @@ export function useWalletAuth() {
   /** Settings flow: caller is authenticated, the signature links one more wallet. */
   async function linkWallet(id: WalletId) {
     await run(id, {
-      auth: true,
+      intent: 'link',
       // The access token may have expired while idling on the page. An
       // authenticated pre-flight forces the refresh-retry path BEFORE the
       // wallet signs: verify sent anonymously would auto-create an orphan

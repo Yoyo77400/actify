@@ -2,7 +2,8 @@ import { prisma } from './prisma'
 import { AppError } from '../utils/http'
 import { generateNonce } from '../utils/nonce'
 import { getChainVerifier } from './chains'
-import { signAccessToken, signRefreshToken, signPendingTotpToken } from '../utils/jwt'
+import { signPendingTotpToken } from '../utils/jwt'
+import { openSession, type SessionContext } from './sessions.service'
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000
 const DEFAULT_ROLE_NAME = 'user'
@@ -93,7 +94,11 @@ export async function createChallenge(input: ChallengeInput) {
   return { nonce, message, expiresAt }
 }
 
-export async function verifyChallenge(input: VerifyInput, authenticatedUserId: string | null) {
+export async function verifyChallenge(
+  input: VerifyInput,
+  authenticatedUserId: string | null,
+  context: SessionContext = {},
+) {
   if (!input.address || !input.publicKey || !input.signature || !input.nonce || !input.chain) {
     throw new AppError(400, 'VALIDATION_ERROR', 'address, publicKey, signature, nonce et chain sont requis')
   }
@@ -183,11 +188,12 @@ export async function verifyChallenge(input: VerifyInput, authenticatedUserId: s
     }
   }
 
+  const tokens = await openSession(finalUser.id, context)
   return {
     mode: 'authenticated' as const,
     isNewAccount,
-    accessToken: signAccessToken(finalUser.id),
-    refreshToken: signRefreshToken(finalUser.id),
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
     user: { id: finalUser.id, username: finalUser.username, role: finalUser.role.name },
   }
 }

@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import { v1Router } from './routes/v1'
 import { errorHandler } from './middlewares/error-handler'
@@ -14,7 +15,23 @@ export function createApp() {
   app.set('trust proxy', true)
 
   app.use(helmet())
-  app.use(cors())
+
+  // Les jetons voyagent en cookies httpOnly : un navigateur ne les envoie (ni
+  // ne les enregistre) sur une requête cross-origin que si le serveur autorise
+  // explicitement les credentials — d'où `credentials: true`.
+  //
+  // En production aucune origine navigateur n'est autorisée, parce qu'aucune
+  // n'en a besoin : l'API n'est pas exposée, seul le proxy Nitro du front
+  // l'appelle en server-to-server (sans en-tête Origin, donc hors CORS).
+  // En développement le front tape l'API directement (:8080 → :3000) : on
+  // reflète l'origine appelante pour ne rien avoir à configurer.
+  //
+  // Si un jour un client navigateur externe doit joindre l'API (front sur un
+  // autre domaine, webapp mobile), c'est ici qu'il faut ajouter sa liste
+  // d'origines — volontairement pas de variable d'environnement tant que ce
+  // besoin n'existe pas.
+  app.use(cors({ origin: process.env.NODE_ENV !== 'production', credentials: true }))
+  app.use(cookieParser())
   app.use(express.json())
 
   app.use('/api/v1', v1Router)
