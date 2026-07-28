@@ -28,10 +28,21 @@
         Impossible de charger les assets de cette collection.
       </p>
       <div v-else-if="assets.length" class="grid grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-4">
-        <ArtistAssetCard v-for="item in assets" :key="item.id" :item="item" />
+        <!-- Le propriétaire voit aussi ses brouillons : sans le badge, un asset
+             rangé mais non publié semblerait déjà visible du public. -->
+        <div v-for="item in assets" :key="item.id" class="relative">
+          <span
+            v-if="item.status && item.status !== 'Published'"
+            class="pill-badge absolute top-3 left-3 z-10 bg-panel-3/90"
+          >{{ item.status === 'Draft' ? 'Brouillon' : item.status }}</span>
+          <ArtistAssetCard :item="item" />
+        </div>
       </div>
       <div v-else class="surface p-8 text-center">
         <p class="text-muted text-sm">Aucun asset publié dans cette collection.</p>
+        <p v-if="collection.isOwner" class="text-muted-2 text-xs mt-1">
+          Vos brouillons rangés ici apparaîtraient dans cette liste.
+        </p>
       </div>
     </section>
   </div>

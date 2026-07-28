@@ -28,14 +28,6 @@
                 v-if="item.status !== 'Published'"
                 class="pill-badge absolute top-3 left-3 z-10 bg-panel-3/90"
               >{{ item.status === 'Draft' ? 'Brouillon' : item.status }}</span>
-              <button
-                type="button"
-                class="ghost-btn absolute top-3 right-3 z-10 !min-h-8 !w-8 !p-0 bg-panel-3/90"
-                aria-label="Modifier"
-                @click="editingAsset = item"
-              >
-                <Icon name="ph:pencil-simple" class="text-sm" />
-              </button>
               <ArtistAssetCard :item="item" />
             </div>
           </div>
@@ -48,11 +40,6 @@
             </NuxtLink>
           </div>
 
-          <AssetEditModal
-            :asset="editingAsset"
-            @close="editingAsset = null"
-            @saved="editingAsset = null; refreshListings()"
-          />
         </section>
 
         <section>
@@ -81,7 +68,7 @@
 
 <script setup lang="ts">
 import type { AssetFilterState } from '~/components/asset/AssetFilterBar.vue'
-import type { AssetCard, CategoryWithCount } from '~/types/asset'
+import type { CategoryWithCount } from '~/types/asset'
 import type { UserProfile } from '~/types/profile'
 
 definePageMeta({ middleware: 'auth' })
@@ -132,7 +119,6 @@ const { data: listingsData, error: listingsError, refresh: refreshListings } = a
   { watch: [listingsFilters] },
 )
 const listings = computed(() => listingsData.value ?? [])
-const editingAsset = ref<AssetCard | null>(null)
 
 function onListingsFiltersChange(next: AssetFilterState) {
   listingsFilters.value = next

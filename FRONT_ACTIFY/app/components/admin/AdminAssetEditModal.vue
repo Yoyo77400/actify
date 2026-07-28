@@ -23,6 +23,7 @@
 
         <AssetEditForm
           v-else-if="loadedAsset"
+          :show-collection="false"
           class="mt-5"
           :initial="loadedAsset"
           :saving="saving"

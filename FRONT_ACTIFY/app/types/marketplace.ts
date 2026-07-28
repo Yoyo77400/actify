@@ -37,6 +37,8 @@ export interface PublicListing {
   viewsCount: number
   salesCount: number
   createdAt: string
+  /** Présent dans une collection vue par son propriétaire (brouillons inclus). */
+  status?: string
 }
 
 // ─── Legacy mock-era display types ───

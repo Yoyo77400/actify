@@ -341,6 +341,37 @@
           </template>
         </div>
 
+        <!-- Owner-only: ranger l'asset dans une de ses collections. Hors de la
+             chaîne d'achat ci-dessus, qui aiguille sur isFree AVANT isOwner —
+             un asset gratuit n'atteindrait jamais cette branche. -->
+        <div v-if="isOwner" class="surface p-5 flex flex-col gap-3">
+          <p class="text-muted text-xs uppercase tracking-widest">Collection</p>
+
+          <select v-model="collectionId" class="select" aria-label="Collection de l'asset">
+            <option :value="null">Aucune collection</option>
+            <option v-for="col in myCollections" :key="col.id" :value="col.id">{{ col.name }}</option>
+          </select>
+
+          <p v-if="collectionError" class="text-danger text-xs" role="alert">{{ collectionError }}</p>
+          <p v-else-if="!myCollections.length" class="text-muted text-xs">
+            Vous n'avez pas encore de collection —
+            <NuxtLink to="/profile" class="text-accent hover:underline">créez-en une depuis votre profil</NuxtLink>.
+          </p>
+
+          <button
+            type="button"
+            class="secondary-btn w-full"
+            :disabled="savingCollection || collectionId === asset.collectionId"
+            @click="saveCollection"
+          >
+            {{ savingCollection ? 'Enregistrement…' : 'Ranger dans cette collection' }}
+          </button>
+
+          <p v-if="asset.status !== 'Published'" class="text-muted-2 text-xs">
+            Cet asset est un brouillon : il n'apparaîtra publiquement dans la collection qu'une fois publié.
+          </p>
+        </div>
+
         <!-- Tokenization panel -->
         <div class="surface p-5 flex flex-col gap-3">
           <p class="text-muted text-xs uppercase tracking-widest">Tokenisation</p>
@@ -493,6 +524,39 @@ const stars = computed(() => {
 })
 
 const isOwner = computed(() => !!user.value && user.value.id === asset.value?.seller.id)
+
+// ── Rangement dans une collection (propriétaire uniquement) ──
+// Chargé à la demande : inutile de solliciter l'API pour un simple visiteur.
+const { data: myCollectionsData } = await useAsyncData(
+  'asset-owner-collections',
+  () => (isOwner.value ? useCollections().mine() : Promise.resolve([])),
+  { watch: [isOwner] },
+)
+const myCollections = computed(() => myCollectionsData.value ?? [])
+
+const collectionId = ref<number | null>(null)
+const savingCollection = ref(false)
+const collectionError = ref<string | null>(null)
+
+// Se resynchronise sur l'asset : après enregistrement, le bouton doit se
+// redésactiver puisque la valeur affichée est devenue la valeur enregistrée.
+watch(asset, (value) => { collectionId.value = value?.collectionId ?? null }, { immediate: true })
+
+async function saveCollection() {
+  savingCollection.value = true
+  collectionError.value = null
+  try {
+    await useAssets().update(asset.value!.id, { collectionId: collectionId.value })
+    // Le bouton se redésactive tout seul une fois la valeur enregistrée : c'est
+    // le retour visuel, pas besoin d'un message de confirmation.
+    await refresh()
+  } catch (e) {
+    collectionError.value = toApiError(e)?.message
+      ?? (isNetworkError(e) ? 'Serveur injoignable, réessayez.' : 'Impossible de ranger cet asset.')
+  } finally {
+    savingCollection.value = false
+  }
+}
 
 // ─── Favorite ───
 const isFavorited = ref(false)
