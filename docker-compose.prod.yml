@@ -46,6 +46,13 @@ services:
       XRPL_TX_POLL_INTERVAL_MS: ${XRPL_TX_POLL_INTERVAL_MS:-1500}
       # Wallet auto-promoted to admin on login (empty = disabled).
       ADMIN_WALLET_ADDRESS: ${ADMIN_WALLET_ADDRESS:-}
+      # Public origin used to build the absolute URLs an NFT carries on-chain
+      # (its XLS-24 metadata document and the image that document points at).
+      # This is the FRONTEND's domain, not the api service: the api sits on an
+      # internal network and is only reachable through the Nitro /api proxy.
+      # :? = refuse to start rather than mint tokens with an unresolvable URI,
+      # which the ledger would then hold immutably.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required (see .env.example)}
       # Where uploaded asset files are stored (persisted via the volume below).
       UPLOADS_DIR: /app/uploads
     volumes:

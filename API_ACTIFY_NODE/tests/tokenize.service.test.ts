@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { randomUUID } from 'node:crypto'
 
 vi.mock('../services/prisma', () => ({
   prisma: {
@@ -24,6 +25,8 @@ const verifyMint = vi.mocked(verifyXrplMint)
 const CREATOR = 'creator-1'
 const TX_HASH = 'a'.repeat(64)
 const NFTOKEN_ID = '000800001234'
+// PUBLIC_BASE_URL comes from vitest.config.ts.
+const METADATA_URI = 'https://actify.test/api/v1/assets/listing-1/metadata'
 
 const draftListing = {
   id: 'listing-1',
@@ -37,6 +40,7 @@ const draftListing = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.unstubAllEnvs()
   walletFindMany.mockResolvedValue([{ address: 'rCreatorWallet' }] as never)
 })
 
@@ -49,11 +53,45 @@ describe('buildMintIntent', () => {
     // 2.5% royalty → TransferFee 2500 (units of 0.001%).
     expect(intent.transferFee).toBe(2500)
     expect(intent.flags).toBe(8) // tfTransferable
-    // Files are stored by Actify, so the NFT URI is a stable Actify reference.
-    expect(intent.uri).toBe('actify:asset:listing-1')
-    expect(intent.uriHex).toBe(Buffer.from('actify:asset:listing-1', 'utf8').toString('hex').toUpperCase())
+    // Resolvable https URL, not an opaque scheme: this is what a wallet fetches
+    // to render a name and an image (XLS-24).
+    expect(intent.uri).toBe(METADATA_URI)
+    expect(intent.uriHex).toBe(Buffer.from(METADATA_URI, 'utf8').toString('hex').toUpperCase())
     expect(intent.minters).toEqual(['rCreatorWallet'])
     expect(intent.nftokenTaxon).toBe(0)
+  })
+
+  it('keeps the URI within the 256-byte XLS-20 blob limit', async () => {
+    listingFindFirst.mockResolvedValue({ ...draftListing, id: randomUUID() } as never)
+    const intent = await buildMintIntent(CREATOR, 'listing-1')
+    expect(Buffer.byteLength(intent.uri, 'utf8')).toBeLessThanOrEqual(256)
+  })
+
+  // Every rejected value below would otherwise mint a URI that is wrong for
+  // good: the ledger keeps it, and nothing can rewrite it afterwards.
+  it.each([
+    ['unset', ''],
+    ['not a URL', 'actify.yohan-georgelin.fr'],
+    ['a non-http scheme', 'ftp://actify.yohan-georgelin.fr'],
+    // Would be truncated to its origin, dropping a prefix the operator meant.
+    ['an origin carrying a path', 'https://actify.yohan-georgelin.fr/actify'],
+  ])('refuses to mint when PUBLIC_BASE_URL is %s, rather than burning a broken URI on-chain', async (_label, value) => {
+    vi.stubEnv('PUBLIC_BASE_URL', value)
+    listingFindFirst.mockResolvedValue(draftListing as never)
+
+    await expect(buildMintIntent(CREATOR, 'listing-1')).rejects.toMatchObject({
+      status: 500,
+      code: 'PUBLIC_URL_NOT_CONFIGURED',
+    })
+  })
+
+  it('accepts an origin written with a trailing slash', async () => {
+    vi.stubEnv('PUBLIC_BASE_URL', 'https://actify.test/')
+    listingFindFirst.mockResolvedValue(draftListing as never)
+
+    const intent = await buildMintIntent(CREATOR, 'listing-1')
+
+    expect(intent.uri).toBe(METADATA_URI)
   })
 
   it('caps TransferFee at 50000 for an out-of-range royalty', async () => {
@@ -92,7 +130,7 @@ describe('confirmMint', () => {
 
     const result = await confirmMint(CREATOR, 'listing-1', TX_HASH)
 
-    const expectedUriHex = Buffer.from('actify:asset:listing-1', 'utf8').toString('hex').toUpperCase()
+    const expectedUriHex = Buffer.from(METADATA_URI, 'utf8').toString('hex').toUpperCase()
     expect(verifyMint).toHaveBeenCalledWith({
       txHash: TX_HASH.toUpperCase(),
       minters: ['rCreatorWallet'],
