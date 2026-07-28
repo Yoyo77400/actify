@@ -15,6 +15,7 @@ export async function create(req: Request, res: Response) {
     shortDescription: body.shortDescription,
     tags: body.tags,
     categoryIds: body.categoryIds,
+    collectionId: body.collectionId,
     distributionMode: body.distributionMode,
     maxDownloads: body.maxDownloads,
     isFree: body.isFree,

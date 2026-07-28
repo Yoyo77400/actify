@@ -3,7 +3,7 @@ import { AppError } from '../utils/http'
 
 vi.mock('../services/prisma', () => ({
   prisma: {
-    listing: { findFirst: vi.fn() },
+    listing: { findFirst: vi.fn(), update: vi.fn() },
     purchase: { count: vi.fn(), create: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     wallet: { findFirst: vi.fn() },
     notification: { create: vi.fn() },
@@ -26,6 +26,7 @@ import {
 } from '../services/orders.service'
 
 const listingFindFirst = vi.mocked(prisma.listing.findFirst)
+const listingUpdate = vi.mocked(prisma.listing.update)
 const purchaseCount = vi.mocked(prisma.purchase.count)
 const purchaseCreate = vi.mocked(prisma.purchase.create)
 const purchaseFindFirst = vi.mocked(prisma.purchase.findFirst)
@@ -191,6 +192,32 @@ describe('createOrder', () => {
     expect(purchaseCount).toHaveBeenCalledWith({ where: { listingId: 'listing-1', status: 'Confirmed' } })
   })
 
+  // Régression : le mode `unique` échappait entièrement à la garde de stock.
+  // Un second acheteur pouvait donc payer en XRP une pièce déjà vendue, sans
+  // qu'aucun NFT ne puisse lui être transféré.
+  it('rejects a unique listing that has already been sold', async () => {
+    listingFindFirst.mockResolvedValue(
+      { ...publishedListing, distributionMode: 'unique', maxDownloads: null } as never,
+    )
+    purchaseCount.mockResolvedValue(1 as never)
+
+    await expect(createOrder(BUYER_ID, { assetId: 'listing-1' })).rejects.toMatchObject({
+      status: 410,
+      code: 'SOLD_OUT',
+    })
+    expect(purchaseCount).toHaveBeenCalledWith({ where: { listingId: 'listing-1', status: 'Confirmed' } })
+  })
+
+  it('accepts a unique listing that has never been sold', async () => {
+    mockHappyPath()
+    listingFindFirst.mockResolvedValue(
+      { ...publishedListing, distributionMode: 'unique', maxDownloads: null } as never,
+    )
+    purchaseCount.mockResolvedValue(0 as never)
+
+    await expect(createOrder(BUYER_ID, { assetId: 'listing-1' })).resolves.toMatchObject({ status: 'Pending' })
+  })
+
   it('accepts a limited listing below its maxDownloads', async () => {
     mockHappyPath()
     listingFindFirst.mockResolvedValue(
@@ -321,6 +348,24 @@ describe('confirmOrder', () => {
     expect(notificationCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ userId: SELLER_ID, type: 'order:confirmed' }),
     })
+    // listings.sales_count was never incremented anywhere, leaving the
+    // catalogue's `sort=sales` permanently ordering by zero.
+    expect(listingUpdate).toHaveBeenCalledWith({
+      where: { id: 'listing-1' },
+      data: { salesCount: { increment: 1 } },
+    })
+  })
+
+  it('leaves the sales counter alone when the order was already resolved', async () => {
+    mockHappyPath()
+    // The guarded transition reports 0 rows: a concurrent confirm/cancel won.
+    purchaseUpdateMany.mockResolvedValue({ count: 0 } as never)
+
+    await expect(confirmOrder(BUYER_ID, 'order-1', REAL_TX_HASH)).rejects.toMatchObject({
+      status: 409,
+      code: 'ORDER_NOT_PENDING',
+    })
+    expect(listingUpdate).not.toHaveBeenCalled()
   })
 
   it('rejects a missing txHash', async () => {

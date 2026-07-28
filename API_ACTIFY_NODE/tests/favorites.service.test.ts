@@ -103,6 +103,7 @@ describe('listMyFavorites', () => {
     seller: { id: 'seller-1', username: 'alice', displayName: 'Alice' },
     listingCategories: [],
     listingTags: [],
+    _count: { purchases: 0 },
   }
 
   it('lists only this user\'s favorited, published listings, using the shared card serializer', async () => {

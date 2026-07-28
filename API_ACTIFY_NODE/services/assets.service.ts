@@ -10,12 +10,24 @@ const PUBLISHED = 'Published'
 const ARCHIVED = 'Archived'
 const DISTRIBUTION_MODES = ['unlimited', 'limited', 'unique']
 
+const CONFIRMED_PURCHASE = 'Confirmed'
+
 const FULL_INCLUDE = {
   seller: true,
   listingCategories: { include: { category: true } },
   listingTags: { include: { tag: true } },
   nft: true,
+  // Real sales come from confirmed purchases: listings.sales_count is a dead
+  // column nothing increments, so it can't drive availability.
+  _count: { select: { purchases: { where: { status: CONFIRMED_PURCHASE } } } },
 } as const
+
+/** Confirmed sales an asset accepts, or null when uncapped. Mirrors orders.service. */
+function saleCapacity(distributionMode: string, maxDownloads: number | null): number | null {
+  if (distributionMode === 'unique') return 1
+  if (distributionMode === 'limited') return maxDownloads
+  return null
+}
 
 type FullListing = Awaited<ReturnType<typeof getFullListingOrThrow>>
 
@@ -63,9 +75,18 @@ function serializeListing(listing: FullListing) {
     distributionMode: listing.distributionMode,
     maxDownloads: listing.maxDownloads,
     royaltyBps: listing.royaltyPercentage != null ? Math.round(Number(listing.royaltyPercentage) * 100) : null,
+    // Needed by the owner's edit form to preselect the current collection.
+    collectionId: listing.collectionId,
     status: listing.status,
     viewsCount: listing.viewsCount,
-    salesCount: listing.salesCount,
+    // Read from the purchases themselves, not listings.sales_count: that
+    // column exists only to make `sort=sales` indexable and can drift, whereas
+    // this figure is always exact.
+    salesCount: listing._count.purchases,
+    soldOut: (() => {
+      const capacity = saleCapacity(listing.distributionMode, listing.maxDownloads)
+      return capacity != null && listing._count.purchases >= capacity
+    })(),
     hasFile: listing.fileIpfsCid != null,
     // Tokenization status: one asset = one XLS-20 NFToken once minted.
     tokenized: listing.nft != null,
@@ -174,6 +195,12 @@ export async function createAsset(userId: string, input: CreateAssetInput) {
   const categoryIds = [...new Set(input.categoryIds ?? [])]
   await assertCategoriesExist(categoryIds)
 
+  // Same guard as on update: a listing may only join a collection its own
+  // seller owns.
+  const collectionId = input.collectionId !== undefined
+    ? await assertAssignableCollection(userId, input.collectionId)
+    : null
+
   const tagNames = normalizeTags(input.tags)
   const slug = await generateUniqueSlug(title)
 
@@ -181,6 +208,7 @@ export async function createAsset(userId: string, input: CreateAssetInput) {
     const created = await tx.listing.create({
       data: {
         sellerId: userId,
+        collectionId,
         title,
         slug,
         shortDescription: input.shortDescription ?? null,
