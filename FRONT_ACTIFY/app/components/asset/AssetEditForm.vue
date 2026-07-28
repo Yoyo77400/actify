@@ -20,6 +20,23 @@
       <input id="edit-asset-tags" v-model.trim="form.tags" type="text" placeholder="cyberpunk, texture, 4k" class="input">
     </div>
 
+    <div class="flex flex-col gap-1.5">
+      <label for="edit-asset-collection" class="text-foreground text-sm font-medium">Collection</label>
+      <select id="edit-asset-collection" v-model="form.collectionId" class="select">
+        <option :value="null">Aucune collection</option>
+        <option v-for="col in collections" :key="col.id" :value="col.id">{{ col.name }}</option>
+      </select>
+      <p class="text-muted text-xs">
+        <template v-if="collections.length">
+          Seules vos propres collections sont proposées.
+        </template>
+        <template v-else>
+          Vous n'avez pas encore de collection —
+          <NuxtLink to="/profile" class="text-accent hover:underline">créez-en une depuis votre profil</NuxtLink>.
+        </template>
+      </p>
+    </div>
+
     <div class="flex flex-col gap-2">
       <span class="text-foreground text-sm font-medium">Mode de distribution</span>
       <div class="grid grid-cols-3 max-sm:grid-cols-1 gap-2">
@@ -87,6 +104,11 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ submit: [UpdateAssetBody]; cancel: [] }>()
 
+// The picker only ever offers the caller's own collections; the API rejects
+// anything else anyway (assertAssignableCollection).
+const { data: collectionsData } = await useAsyncData('my-collections-picker', () => useCollections().mine())
+const collections = computed(() => collectionsData.value ?? [])
+
 const form = reactive({
   title: '',
   shortDescription: '',
@@ -97,6 +119,7 @@ const form = reactive({
   isFree: false,
   basePrice: null as number | null,
   royaltyPercent: 0,
+  collectionId: null as number | null,
 })
 
 watch(() => props.initial, (asset) => {
@@ -109,6 +132,7 @@ watch(() => props.initial, (asset) => {
   form.isFree = asset.isFree
   form.basePrice = asset.price != null ? Number(asset.price) : null
   form.royaltyPercent = asset.royaltyBps != null ? asset.royaltyBps / 100 : 0
+  form.collectionId = asset.collectionId
 }, { immediate: true })
 
 function submit() {
@@ -122,6 +146,7 @@ function submit() {
     isFree: form.isFree,
     basePrice: form.isFree ? null : form.basePrice,
     royaltyBps: Math.round(Math.min(100, Math.max(0, form.royaltyPercent)) * 100),
+    collectionId: form.collectionId,
   })
 }
 </script>

@@ -32,7 +32,10 @@ export interface AssetCard {
   distributionMode: string
   maxDownloads: number | null
   royaltyBps: number | null
+  collectionId: number | null
   status: string
+  /** true quand la capacité est atteinte : pièce unique vendue, ou quota `limited` épuisé. */
+  soldOut: boolean
   viewsCount: number
   salesCount: number
   hasFile: boolean
@@ -83,6 +86,8 @@ export interface UpdateAssetBody {
   basePrice?: number | null
   currency?: string | null
   royaltyBps?: number | null
+  /** null détache l'asset de sa collection ; undefined le laisse inchangé. */
+  collectionId?: number | null
 }
 
 export interface CreateAssetBody {
@@ -91,6 +96,7 @@ export interface CreateAssetBody {
   shortDescription?: string | null
   tags?: string[]
   categoryIds?: number[]
+  collectionId?: number | null
   distributionMode?: 'unlimited' | 'limited' | 'unique'
   maxDownloads?: number | null
   isFree?: boolean

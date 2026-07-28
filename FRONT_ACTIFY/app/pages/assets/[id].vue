@@ -192,6 +192,20 @@
             <p class="text-muted-2 text-xs text-center">Vous êtes le vendeur de cet asset.</p>
           </template>
 
+          <!-- Sold out: no buy affordance at all. The API refuses the order
+               anyway, but showing the button invited a real XRP payment for a
+               piece that can never be delivered. -->
+          <template v-else-if="asset.soldOut">
+            <button type="button" class="primary-btn w-full" disabled>
+              {{ asset.distributionMode === 'unique' ? 'Pièce déjà vendue' : 'Épuisé' }}
+            </button>
+            <p class="text-muted-2 text-xs text-center">
+              {{ asset.distributionMode === 'unique'
+                ? 'Cette pièce unique a trouvé son acquéreur.'
+                : 'Toutes les licences de cet asset ont été vendues.' }}
+            </p>
+          </template>
+
           <!-- Paid: order + wallet payment in a single gesture -->
           <template v-else>
             <p v-if="order" class="text-success text-sm flex items-center gap-2">

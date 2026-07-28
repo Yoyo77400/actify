@@ -44,7 +44,13 @@ export default defineConfig({
       cwd: '../API_ACTIFY_NODE',
       url: `${API_BASE}/health`,
       timeout: 120_000,
-      reuseExistingServer: !process.env.CI,
+      // NEVER reuse an API already on this port. The suite assumes the pglite
+      // database is empty (its wallets are fixed seeds, so "new wallet →
+      // /auth/register" only holds on a fresh DB). Reusing a dev API silently
+      // ran the tests against the persistent Postgres, where those accounts
+      // already exist — three specs failed for a reason unrelated to the code.
+      // Failing to bind gives an explicit "port already used" instead.
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
       env: {
@@ -58,7 +64,9 @@ export default defineConfig({
       command: 'npm run dev',
       url: FRONT_URL,
       timeout: 120_000,
-      reuseExistingServer: !process.env.CI,
+      // Same reasoning as the API above: a dev front already running points at
+      // the dev API, not at the ephemeral one this config starts.
+      reuseExistingServer: false,
       env: {
         PORT: String(FRONT_PORT),
         NUXT_PUBLIC_API_BASE: API_BASE,

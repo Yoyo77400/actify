@@ -114,6 +114,17 @@
               </div>
               <p v-else class="text-muted text-xs">Aucune catégorie disponible.</p>
             </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label for="new-asset-collection" class="text-foreground text-sm font-medium">Collection</label>
+              <select id="new-asset-collection" v-model="form.collectionId" class="select">
+                <option :value="null">Aucune collection</option>
+                <option v-for="col in myCollections" :key="col.id" :value="col.id">{{ col.name }}</option>
+              </select>
+              <p class="text-muted text-xs">
+                Optionnel — vous pourrez aussi le ranger plus tard depuis votre profil.
+              </p>
+            </div>
           </section>
 
           <!-- Step 2: Distribution & prix -->
@@ -337,11 +348,16 @@ const { step: tokenizeStep, tokenize } = useTokenize()
 const { data: categoriesData } = await useAsyncData('asset-new-categories', () => assets.categories())
 const categoriesList = computed<CategoryWithCount[]>(() => categoriesData.value ?? [])
 
+// Only the caller's own collections — the API refuses anything else.
+const { data: collectionsData } = await useAsyncData('asset-new-collections', () => useCollections().mine())
+const myCollections = computed(() => collectionsData.value ?? [])
+
 const form = reactive({
   title: '',
   shortDescription: '',
   description: '',
   categoryIds: [] as number[],
+  collectionId: null as number | null,
   distributionMode: 'unlimited' as DistributionMode,
   maxDownloads: null as number | null,
   isFree: false,
@@ -437,6 +453,7 @@ function buildBody(): CreateAssetBody {
     shortDescription: form.shortDescription.trim() || null,
     description: form.description.trim() || null,
     categoryIds: form.categoryIds,
+    collectionId: form.collectionId,
     distributionMode: form.distributionMode,
     maxDownloads: form.distributionMode === 'limited' ? numOrNull(form.maxDownloads) : null,
     isFree: form.isFree,
