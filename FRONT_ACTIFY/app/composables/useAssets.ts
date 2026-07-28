@@ -3,6 +3,7 @@ import type {
   AssetDetail,
   CategoryWithCount,
   CreateAssetBody,
+  UpdateAssetBody,
 } from '~/types/asset'
 
 export interface AssetListParams {
@@ -37,6 +38,7 @@ export function useAssets() {
     get: (idOrSlug: string) => api.get<AssetDetail>(`/assets/${idOrSlug}`),
     categories: () => api.get<CategoryWithCount[]>('/categories'),
     create: (body: CreateAssetBody) => api.post<AssetCard>('/assets', body),
+    update: (id: string, body: UpdateAssetBody) => api.put<AssetCard>(`/assets/${id}`, body),
     publish: (id: string) => api.post<AssetCard>(`/assets/${id}/publish`),
     myListings: (params: AssetListParams = {}) => api.get<AssetCard[]>(`/creator/listings${toQuery(params)}`),
     uploadFile: (id: string, file: File) => {
