@@ -38,15 +38,26 @@ defineEmits<{ select: [id: WalletId] }>()
 // undefined = check in progress → button stays disabled, no "Installer" link yet.
 const availability = ref<Partial<Record<WalletId, boolean>>>({})
 
+// Les extensions injectent leur API de façon asynchrone, et le délai varie
+// beaucoup (démarrage à froid du navigateur, machine chargée). Une seule
+// re-vérification à 1,5 s laissait le bouton grisé DÉFINITIVEMENT chez qui a
+// pourtant le wallet installé. On réessaie donc sur ~11 s, en espaçant.
+const RETRY_DELAYS_MS = [300, 700, 1500, 3000, 5000]
+
+const timers = new Set<ReturnType<typeof setTimeout>>()
+
 function checkAvailability(id: WalletId, attempt = 0) {
   getWalletAdapter(id)
     .then(adapter => adapter.isAvailable())
     .then((available) => {
       availability.value[id] = available
-      // Extensions inject their API asynchronously — one delayed re-check
-      // avoids showing "Installer" to users who do have the wallet.
-      if (!available && attempt === 0) {
-        setTimeout(() => checkAvailability(id, 1), 1500)
+      const delay = RETRY_DELAYS_MS[attempt]
+      if (!available && delay !== undefined) {
+        const timer = setTimeout(() => {
+          timers.delete(timer)
+          checkAvailability(id, attempt + 1)
+        }, delay)
+        timers.add(timer)
       }
     })
     .catch(() => {
@@ -54,9 +65,23 @@ function checkAvailability(id: WalletId, attempt = 0) {
     })
 }
 
-onMounted(() => {
+function checkAll() {
   for (const { id } of walletDescriptors) {
-    checkAvailability(id)
+    // Ne pas relancer une détection pour un wallet déjà trouvé.
+    if (availability.value[id] !== true) checkAvailability(id)
   }
+}
+
+onMounted(() => {
+  checkAll()
+  // L'utilisateur part installer ou déverrouiller son wallet puis revient :
+  // sans ça, il devrait recharger la page pour que le bouton s'active.
+  window.addEventListener('focus', checkAll)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', checkAll)
+  for (const timer of timers) clearTimeout(timer)
+  timers.clear()
 })
 </script>
