@@ -7,8 +7,10 @@
     <div class="surface w-full max-w-sm p-8 flex flex-col items-center gap-5 relative z-10">
       <nuxt-link to="/">
         <div class="flex flex-col items-center gap-2 text-center">
-          <div class="w-14 h-14 rounded-2xl bg-gradient-to-b from-[#7c5cbf] to-[#4a2d8a] flex items-center justify-center mb-1">
-            <Icon name="ph:package" class="text-2xl text-white" />
+          <!-- Même logo que la sidebar : l'icône de carton générique ne
+               représentait pas la marque. -->
+          <div class="w-14 h-14 rounded-2xl overflow-hidden mb-1">
+            <img src="/actify-circle.png" alt="Actify" class="w-full h-full object-cover">
           </div>
           <h1 class="ethnocentric text-foreground text-xl tracking-wide">ActiFy</h1>
           <p class="text-muted text-xs">Digital Curator Ledger</p>
