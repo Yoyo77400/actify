@@ -15,5 +15,12 @@ export function useCollections() {
     create: (name: string) => api.post<Collection>('/collections', { name }),
     rename: (id: number, name: string) => api.put<Collection>(`/collections/${id}`, { name }),
     remove: (id: number) => api.del<{ id: number; deleted: boolean }>(`/collections/${id}`),
+
+    /** Couverture : le champ `img` ne stocke qu'une clé, les octets passent par ici. */
+    uploadImage: (id: number, file: File) => {
+      const fd = new FormData()
+      fd.append('image', file)
+      return api.post<Collection>(`/collections/${id}/image`, fd)
+    },
   }
 }
