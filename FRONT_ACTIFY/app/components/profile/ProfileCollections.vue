@@ -23,6 +23,16 @@
         >
         <p class="text-muted text-xs">2 à 100 caractères. Le nom doit être unique.</p>
       </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="cover-picker" :class="busy ? 'pointer-events-none opacity-60' : ''">
+          <img :src="coverPreview" alt="" class="w-full h-full object-cover">
+          <span class="picker-hint">
+            <Icon name="ph:image" class="text-base" />
+          </span>
+          <input type="file" accept="image/*" class="sr-only" @change="onCoverPick">
+        </label>
+        <p class="text-muted text-xs text-center">Couverture</p>
+      </div>
       <button type="submit" class="primary-btn text-sm" :disabled="busy">
         {{ editing === 0 ? 'Créer' : 'Renommer' }}
       </button>
@@ -33,7 +43,7 @@
       <div v-for="col in collections" :key="col.id" class="surface overflow-hidden flex flex-col">
         <NuxtLink :to="`/collections/${col.slug}`">
           <img
-            :src="col.img ?? bannerImage(null, col.slug)"
+            :src="bannerImage(col.img, col.slug)"
             :alt="col.name"
             class="w-full h-[130px] object-cover bg-panel-3"
             loading="lazy"
@@ -87,11 +97,36 @@ const error = ref<string | null>(null)
 const pendingDelete = ref<number | null>(null)
 const nameInput = useTemplateRef<HTMLInputElement>('nameInput')
 
+// Couverture choisie mais pas encore envoyée : à la création, la collection
+// n'existe pas encore, donc l'upload ne peut avoir lieu qu'après. Annuler le
+// formulaire ne doit rien laisser derrière.
+const pendingCover = ref<File | null>(null)
+const coverObjectUrl = ref<string | null>(null)
+const editingCollection = computed(() => collections.value.find(c => c.id === editing.value) ?? null)
+const coverPreview = computed(() =>
+  coverObjectUrl.value ?? bannerImage(editingCollection.value?.img, editingCollection.value?.slug ?? 'new'),
+)
+
+function revokeCover() {
+  if (coverObjectUrl.value) URL.revokeObjectURL(coverObjectUrl.value)
+  coverObjectUrl.value = null
+  pendingCover.value = null
+}
+
+function onCoverPick(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  pendingCover.value = file
+  if (coverObjectUrl.value) URL.revokeObjectURL(coverObjectUrl.value)
+  coverObjectUrl.value = URL.createObjectURL(file)
+}
+
 function open(id: number, initial: string) {
   editing.value = id
   name.value = initial
   error.value = null
   pendingDelete.value = null
+  revokeCover()
   nextTick(() => nameInput.value?.focus())
 }
 
@@ -102,6 +137,7 @@ function cancel() {
   editing.value = null
   name.value = ''
   error.value = null
+  revokeCover()
 }
 
 async function submit() {
@@ -109,8 +145,13 @@ async function submit() {
   busy.value = true
   error.value = null
   try {
-    if (editing.value === 0) await collectionsApi.create(name.value)
-    else await collectionsApi.rename(editing.value, name.value)
+    // La couverture part APRÈS : à la création, l'id n'existe pas avant.
+    const saved = editing.value === 0
+      ? await collectionsApi.create(name.value)
+      : await collectionsApi.rename(editing.value, name.value)
+    if (pendingCover.value) {
+      await collectionsApi.uploadImage(saved.id, pendingCover.value)
+    }
     await refresh()
     cancel()
   } catch (e) {
@@ -139,4 +180,34 @@ async function confirmRemove(col: Collection) {
     pendingDelete.value = null
   }
 }
+
+onBeforeUnmount(revokeCover)
 </script>
+
+<style scoped>
+/* Même principe que les images de profil : le <label> englobe un input masqué,
+   donc l'aperçu entier est cliquable et reste accessible au clavier. */
+.cover-picker {
+  position: relative;
+  display: block;
+  width: 96px;
+  height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--color-line);
+}
+.picker-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.cover-picker:hover .picker-hint,
+.cover-picker:focus-within .picker-hint { opacity: 1; }
+</style>

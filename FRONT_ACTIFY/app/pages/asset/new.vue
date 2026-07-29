@@ -502,7 +502,18 @@ async function onSubmit() {
   }
   phase.value = 'creating'
   try {
-    const draft = await assets.create(buildBody())
+    // Reprise après échec : on RÉUTILISE le brouillon déjà créé au lieu d'en
+    // créer un nouveau. Le brouillon naissait avant l'upload, mais `created`
+    // n'était renseigné qu'après : un upload en échec (image refusée, fichier
+    // trop lourd) laissait donc un orphelin à chaque tentative — d'où des
+    // assets en double, et visibles dans la collection choisie au formulaire.
+    // Le corps est renvoyé pour tenir compte des champs éventuellement corrigés.
+    const draft = created.value
+      ? await assets.update(created.value.id, buildBody())
+      : await assets.create(buildBody())
+    // Posé AVANT les uploads : c'est ce qui rend la reprise idempotente.
+    created.value = draft
+
     await assets.uploadFile(draft.id, file.value)
     // The thumbnail is the asset's public visual. When the main file is
     // itself an image and no dedicated thumbnail was picked, reuse it —
@@ -512,7 +523,6 @@ async function onSubmit() {
     if (displayImage) {
       await assets.uploadThumbnail(draft.id, displayImage)
     }
-    created.value = draft
     phase.value = 'tokenize'
   } catch (err) {
     error.value = toApiError(err)?.message ?? 'Impossible de créer le brouillon, réessayez.'
