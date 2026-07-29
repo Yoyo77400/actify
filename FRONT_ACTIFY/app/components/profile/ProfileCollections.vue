@@ -34,7 +34,7 @@
         <p class="text-muted text-xs text-center">Couverture</p>
       </div>
       <button type="submit" class="primary-btn text-sm" :disabled="busy">
-        {{ editing === 0 ? 'Créer' : 'Renommer' }}
+        {{ editing === 0 ? 'Créer' : 'Modifier' }}
       </button>
       <button type="button" class="ghost-btn text-sm" :disabled="busy" @click="cancel">Annuler</button>
     </form>
@@ -59,7 +59,7 @@
             </p>
           </div>
           <div class="flex gap-2 mt-auto">
-            <button type="button" class="ghost-btn text-xs px-3" @click="startRename(col)">Renommer</button>
+            <button type="button" class="ghost-btn text-xs px-3" @click="startRename(col)">Modifier</button>
             <button
               type="button"
               class="ghost-btn text-xs px-3 text-danger border-danger/30 hover:bg-danger/10"
