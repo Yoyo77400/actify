@@ -37,7 +37,7 @@
           </div>
           <div class="flex gap-2.5 flex-wrap mt-2.5">
             <span v-if="artist.username" class="pill-badge">@{{ artist.username }}</span>
-            <span class="pill-badge">Inscrit le {{ joinedLabel }}</span>
+            <span class="pill-badge">Inscrit en {{ joinedLabel }}</span>
             <span v-if="artist.isVerified" class="pill-badge text-accent-2">
               <Icon name="ph:seal-check" class="text-sm" />
               Vérifié
