@@ -18,6 +18,7 @@ vi.mock('../services/prisma', () => ({
 import { prisma } from '../services/prisma'
 import {
   assertAssignableCollection,
+  setCollectionImage,
   createCollection,
   deleteCollection,
   updateCollection,
@@ -112,5 +113,30 @@ describe('deleteCollection', () => {
       data: { collectionId: null },
     })
     expect(prisma.collection.delete).toHaveBeenCalledWith({ where: { id: 7 } })
+  })
+})
+
+describe('setCollectionImage', () => {
+  it('refuse de remplacer la couverture d\'une collection qui n\'est pas la sienne', async () => {
+    findUnique.mockResolvedValue({ ...owned, ownerId: 'someone-else' } as never)
+
+    await expect(setCollectionImage(OWNER, 7, 'key.png')).rejects.toMatchObject({
+      status: 404,
+      code: 'NOT_FOUND',
+    })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('enregistre la clé de stockage sur sa propre collection', async () => {
+    findUnique.mockResolvedValue(owned as never)
+    update.mockResolvedValue({ ...owned, img: 'key.png', _count: { listings: 0 } } as never)
+
+    const result = await setCollectionImage(OWNER, 7, 'key.png')
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 7 },
+      data: { img: 'key.png' },
+    }))
+    expect(result.img).toBe('key.png')
   })
 })

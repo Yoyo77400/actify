@@ -46,7 +46,7 @@
             class="surface overflow-hidden"
           >
             <img
-              :src="col.img ?? bannerImage(null, col.slug)"
+              :src="bannerImage(col.img, col.slug)"
               :alt="col.name"
               class="w-full h-[140px] object-cover bg-panel-3"
               loading="lazy"

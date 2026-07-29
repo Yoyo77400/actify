@@ -195,6 +195,21 @@ export async function deleteCollection(userId: string, id: number) {
   return { id, deleted: true }
 }
 
+/**
+ * Enregistre la couverture d'une collection (clé de stockage déjà uploadée).
+ * La propriété est vérifiée : sans ça, n'importe qui pourrait remplacer
+ * l'image d'une collection qui ne lui appartient pas.
+ */
+export async function setCollectionImage(userId: string, id: number, key: string) {
+  await getOwnedCollectionOrThrow(userId, id)
+  const collection = await prisma.collection.update({
+    where: { id },
+    data: { img: key },
+    include: COLLECTION_COUNT,
+  })
+  return serializeCollection(collection)
+}
+
 /** The caller's own collections, drafts included in the count's sibling pages. */
 export async function listMyCollections(userId: string) {
   const rows = await prisma.collection.findMany({

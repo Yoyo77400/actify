@@ -3,6 +3,7 @@ import { unlink } from 'node:fs/promises'
 import { AppError, sendSuccess } from '../utils/http'
 import { compressThumbnail, resolveStoredPath, sniffImageMime } from '../services/storage'
 import * as uploadsService from '../services/uploads.service'
+import * as collectionsService from '../services/collections.service'
 
 function requireUploadedFile(req: Request) {
   if (!req.file) {
@@ -40,6 +41,25 @@ export async function uploadAvatar(req: Request, res: Response) {
 export async function uploadBanner(req: Request, res: Response) {
   const file = requireUploadedFile(req)
   const result = await uploadsService.setUserBanner(req.user!.id, file.filename)
+  sendSuccess(res, result, undefined, 201)
+}
+
+// Couverture d'une collection. Même traitement que les miniatures d'asset :
+// l'image est compressée, et un fichier illisible est supprimé plutôt que
+// laissé sur le disque.
+export async function uploadCollectionImage(req: Request, res: Response) {
+  const file = requireUploadedFile(req)
+  try {
+    await compressThumbnail(file.path)
+  } catch {
+    await unlink(file.path).catch(() => {})
+    throw new AppError(400, 'VALIDATION_ERROR', 'Image invalide ou illisible')
+  }
+  const result = await collectionsService.setCollectionImage(
+    req.user!.id,
+    Number(req.params.id),
+    file.filename,
+  )
   sendSuccess(res, result, undefined, 201)
 }
 

@@ -79,7 +79,7 @@ const { data: assetsData, error: assetsError } = await useAsyncData(
 const assets = computed(() => assetsData.value ?? [])
 
 const cover = computed(() =>
-  collection.value?.img ?? bannerImage(null, collection.value?.slug ?? 'collection'),
+  bannerImage(collection.value?.img, collection.value?.slug ?? 'collection'),
 )
 
 useHead(() => ({ title: collection.value?.name ?? 'Collection' }))
